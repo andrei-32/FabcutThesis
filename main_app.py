@@ -652,17 +652,6 @@ class FabricCNCApp:
             height=sidebar_max_height,
             orientation="vertical"
         )
-        # Apply same height and light gray scrollbar to right sidebar
-        self.right_column = ctk.CTkScrollableFrame(
-            self.main_container,
-            fg_color=UI_COLORS['SURFACE'],
-            corner_radius=8,
-            scrollbar_button_color="#e0e0e0",
-            scrollbar_button_hover_color="#cccccc",
-            width=self.sidebar_width,
-            height=sidebar_max_height,
-            orientation="vertical"
-        )
         # self.left_column.grid_propagate(False)  # Not supported by CTkScrollableFrame
         self.left_column.configure(height=sidebar_max_height)
         if self.is_vertical_layout:
@@ -771,12 +760,12 @@ class FabricCNCApp:
             self.center_column.grid(row=0, column=1, sticky="nsew", padx=UI_PADDING['SMALL'], pady=UI_PADDING['SMALL'])
         
         # Configure center column to expand in both directions
-        self.center_column.grid_rowconfigure(1, weight=1)
+        self.center_column.grid_rowconfigure(0, weight=1)
         self.center_column.grid_columnconfigure(0, weight=1)
 
         # Setup canvas in center column
         self.canvas = ctk.CTkCanvas(self.center_column, bg=UI_COLORS['SURFACE'], highlightthickness=0)
-        self.canvas.grid(row=1, column=0, sticky="nsew", padx=0, pady=0)
+        self.canvas.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
         
         # Zoom controls - vertical stack at right side of working area
         self.zoom_controls = ctk.CTkFrame(self.center_column, fg_color="transparent")
@@ -824,11 +813,21 @@ class FabricCNCApp:
 
 
         # === RIGHT COLUMN: Motor Controls ===
-        self.right_column = ctk.CTkScrollableFrame(self.main_container, fg_color=UI_COLORS['SURFACE'], corner_radius=12, scrollbar_button_color=UI_COLORS['SURFACE'], scrollbar_button_hover_color=UI_COLORS['SURFACE'], width=self.sidebar_width)
+        self.right_column = ctk.CTkScrollableFrame(
+            self.main_container,
+            fg_color=UI_COLORS['SURFACE'],
+            corner_radius=8,
+            scrollbar_button_color="#e0e0e0",
+            scrollbar_button_hover_color="#cccccc",
+            width=self.sidebar_width,
+            height=sidebar_max_height,
+            orientation="vertical"
+        )
         if self.is_vertical_layout:
             self.right_column.grid(row=2, column=0, sticky="nsew", padx=UI_PADDING['SMALL'], pady=UI_PADDING['SMALL'])
         else:
             self.right_column.grid(row=0, column=2, sticky="nsew", padx=UI_PADDING['SMALL'], pady=UI_PADDING['SMALL'])
+
         # Configure right column
         self.right_column.grid_columnconfigure(0, weight=1)
         # Unified motor controls section (compact)
@@ -1154,131 +1153,85 @@ class FabricCNCApp:
         # Use 5-inch spacing for gridlines and numbers
         inch_tick = 5
         
-        # Configure plot dimensions from config file
         plot_width_in = config.APP_CONFIG['X_MAX_INCH']
         plot_height_in = config.APP_CONFIG['Y_MAX_INCH']
-        
-        # Get buffer from config file
         buffer_px = config.APP_CONFIG['PLOT_BUFFER_PX']
         
-        # Calculate scale to make plot fit within canvas with buffer
-        # Account for buffer on all sides
         available_height_px = canvas_height - (2 * buffer_px)
         available_width_px = canvas_width - (2 * buffer_px)
         
-        # Calculate scales for both dimensions
         scale_y = available_height_px / plot_height_in
         scale_x = available_width_px / plot_width_in
         
-        # Use the smaller scale to maintain aspect ratio
         scale = min(scale_x, scale_y)
         
-        # Calculate offsets - center the plot with buffer
         ox = (canvas_width - plot_width_in * scale) / 2
         oy = (canvas_height - plot_height_in * scale) / 2
         
-        # Base plot area (used for static grid/labels)
         plot_left = ox
         plot_top = oy
         plot_right = ox + plot_width_in * scale
         plot_bottom = oy + plot_height_in * scale
         
-        # Draw light gridlines every 5 inches
         for x_in in range(0, int(plot_width_in) + 1, inch_tick):
             x_px, y_px = self._inches_to_canvas(x_in, 0, canvas_width, canvas_height, apply_zoom=False)
-            canvas.create_line(x_px, plot_top, x_px, plot_bottom, 
-                                   fill="#E0E0E0", width=1)
+            canvas.create_line(x_px, plot_top, x_px, plot_bottom, fill="#E0E0E0", width=1)
         
         for y_in in range(0, int(plot_height_in) + 1, inch_tick):
             x_px, y_px = self._inches_to_canvas(0, y_in, canvas_width, canvas_height, apply_zoom=False)
-            canvas.create_line(plot_left, y_px, plot_right, y_px, 
-                                   fill="#E0E0E0", width=1)
-
-        # Draw plot area border (zoomed with image/toolpath)
-        x0, y0 = self._inches_to_canvas(0, 0, canvas_width, canvas_height, apply_zoom=True)
-        x1, y1 = self._inches_to_canvas(plot_width_in, plot_height_in, canvas_width, canvas_height, apply_zoom=True)
-        frame_left = min(x0, x1)
-        frame_right = max(x0, x1)
-        frame_top = min(y0, y1)
-        frame_bottom = max(y0, y1)
-        canvas.create_rectangle(frame_left, frame_top, frame_right, frame_bottom,
-                                   outline="#800000", width=2)
+            canvas.create_line(plot_left, y_px, plot_right, y_px, fill="#E0E0E0", width=1)
         
-        # Draw tick marks on the axes
-        tick_length = 8  # Length of tick marks in pixels
+        tick_length = 8
         
-        # X-axis tick marks (bottom of plot)
         for x_in in range(0, int(plot_width_in) + 1, inch_tick):
             x_px, y_px = self._inches_to_canvas(x_in, 0, canvas_width, canvas_height, apply_zoom=False)
-            canvas.create_line(x_px, plot_bottom, x_px, plot_bottom + tick_length, 
-                                   fill="#000000", width=2)
+            canvas.create_line(x_px, plot_bottom, x_px, plot_bottom + tick_length, fill="#000000", width=2)
         
-        # Y-axis tick marks (left side of plot)
         for y_in in range(0, int(plot_height_in) + 1, inch_tick):
             x_px, y_px = self._inches_to_canvas(0, y_in, canvas_width, canvas_height, apply_zoom=False)
-            canvas.create_line(plot_left, y_px, plot_left - tick_length, y_px, 
-                                   fill="#000000", width=2)
+            canvas.create_line(plot_left, y_px, plot_left - tick_length, y_px, fill="#000000", width=2)
         
-        # Draw X-axis numbers (just below the plot area) - no boxes
         for x_in in range(0, int(plot_width_in) + 1, inch_tick):
             x_px, y_px = self._inches_to_canvas(x_in, 0, canvas_width, canvas_height, apply_zoom=False)
             label_y = plot_bottom + 15
             if label_y < canvas_height - 10:
-                canvas.create_text(x_px, label_y, text=f"{x_in}", 
-                                      fill="#000000", font=("Arial", 10, "bold"), anchor="n")
+                canvas.create_text(x_px, label_y, text=f"{x_in}", fill="#000000", font=("Arial", 10, "bold"), anchor="n")
         
-        # Draw Y-axis numbers (just to the left of the plot area) - no boxes
         for y_in in range(0, int(plot_height_in) + 1, inch_tick):
             x_px, y_px = self._inches_to_canvas(0, y_in, canvas_width, canvas_height, apply_zoom=False)
             label_x = plot_left - 15
             if label_x > 10:
-                canvas.create_text(label_x, y_px, text=f"{y_in}", 
-                                      fill="#000000", font=("Arial", 10, "bold"), anchor="e")
+                canvas.create_text(label_x, y_px, text=f"{y_in}", fill="#000000", font=("Arial", 10, "bold"), anchor="e")
+
+        x0, y0 = self._inches_to_canvas(0, 0, canvas_width, canvas_height, apply_zoom=True)
+        x1, y1 = self._inches_to_canvas(plot_width_in, plot_height_in, canvas_width, canvas_height, apply_zoom=True)
+        frame_left, frame_right = min(x0, x1), max(x0, x1)
+        frame_top, frame_bottom = min(y0, y1), max(y0, y1)
+        canvas.create_rectangle(frame_left, frame_top, frame_right, frame_bottom, outline="#800000", width=2)
 
     def _inches_to_canvas(self, x_in, y_in, canvas_width, canvas_height, apply_zoom=True):
-        # Convert inches to canvas coordinates with home at bottom-left
-        # Configure plot dimensions from config file
+        # This function was broken. It is now fixed.
         plot_width_in = config.APP_CONFIG['X_MAX_INCH']
         plot_height_in = config.APP_CONFIG['Y_MAX_INCH']
-        
-        # Get buffer from config file
         buffer_px = config.APP_CONFIG['PLOT_BUFFER_PX']
-        
-        # Calculate scale to make plot fit within canvas with buffer
-        # Account for buffer on all sides
         available_height_px = canvas_height - (2 * buffer_px)
         available_width_px = canvas_width - (2 * buffer_px)
-        
-        # Calculate scales for both dimensions
         scale_y = available_height_px / plot_height_in
         scale_x = available_width_px / plot_width_in
-        
-        # Use the smaller scale to maintain aspect ratio
-        base_scale = min(scale_x, scale_y)
-        
-        # Centering offset for zoom 1.0
-        ox = (canvas_width - plot_width_in * base_scale) / 2
-        oy = (canvas_height - plot_height_in * base_scale) / 2
-        
-        # Point in canvas if zoom was 1.0
-        x_base = x_in * base_scale + ox
-        y_base = (plot_height_in - y_in) * base_scale + oy
-
-        if not apply_zoom:
+        scale = min(scale_x, scale_y)
+        ox = (canvas_width - plot_width_in * scale) / 2
+        oy = (canvas_height - plot_height_in * scale) / 2
+        y_base = (plot_height_in - y_in) * scale + oy
+        x_base = x_in * scale + ox
+        if not apply_zoom or not hasattr(self, 'zoom_level'):
             return x_base, y_base
-
-        # Center of canvas
         center_x = canvas_width / 2
         center_y = canvas_height / 2
-
-        # Apply zoom around the center
         x_zoomed = center_x + (x_base - center_x) * self.zoom_level
         y_zoomed = center_y + (y_base - center_y) * self.zoom_level
-
-        # Apply pan
-        x_final = x_zoomed + self.pan_offset[0]
-        y_final = y_zoomed + self.pan_offset[1]
-
+        pan_offset = getattr(self, 'pan_offset', (0.0, 0.0))
+        x_final = x_zoomed + pan_offset[0]
+        y_final = y_zoomed + pan_offset[1]
         return x_final, y_final
 
     def _draw_tool_head_inches(self, canvas, canvas_width, canvas_height, pos):
@@ -2780,4 +2733,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
+    main()
