@@ -637,16 +637,18 @@ class FabricCNCApp:
             self.main_container.grid_rowconfigure(0, weight=1)
         
         # === LEFT COLUMN: Job Control ===
-        sidebar_max_height = int(self.root.winfo_screenheight() * 0.90)  # 90% of screen height to avoid cutoff
+        sidebar_max_height = int(self.root.winfo_screenheight() * 0.60)  # 60% of screen height for even shorter sidebar
         self.left_column = ctk.CTkScrollableFrame(
             self.main_container,
             fg_color=UI_COLORS['SURFACE'],
-            corner_radius=12,
+            corner_radius=8,
             scrollbar_button_color=UI_COLORS['SURFACE'],
             scrollbar_button_hover_color=UI_COLORS['SURFACE'],
             width=self.sidebar_width,
             height=sidebar_max_height
         )
+        # Apply same height to right sidebar
+        self.right_column = ctk.CTkScrollableFrame(self.main_container, fg_color=UI_COLORS['SURFACE'], corner_radius=8, scrollbar_button_color=UI_COLORS['SURFACE'], scrollbar_button_hover_color=UI_COLORS['SURFACE'], width=self.sidebar_width, height=sidebar_max_height)
         # self.left_column.grid_propagate(False)  # Not supported by CTkScrollableFrame
         self.left_column.configure(height=sidebar_max_height)
         if self.is_vertical_layout:
