@@ -2480,9 +2480,9 @@ class FabricCNCApp:
         if not MOTOR_IMPORTS_AVAILABLE or SIMULATION_MODE:
             return
 
-        # Temporary test window to allow limited negative XY motion during axis mapping.
-        test_min_x = -1.0
-        test_min_y = -1.0
+        # TEMPORARY: Allow larger negative values for testing without homing
+        test_min_x = -10.0  # Relaxed bounds to bypass homing requirement
+        test_min_y = -10.0  # Relaxed bounds to bypass homing requirement
         
         # Get current position
         current_pos = self.motor_ctrl.get_position()
