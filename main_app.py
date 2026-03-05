@@ -236,9 +236,6 @@ class RealMotorController:
             target_val = current_val + delta
             actual_delta = delta  # Use the requested delta directly
 
-            # Debug logging
-            print(f"[JOG DEBUG] {axis}: current={current_val:.3f}, delta={delta:.3f}, target={target_val:.3f}, actual_delta={actual_delta:.3f}")
-
             if abs(actual_delta) > 1e-6:
                 # Use specified jog feedrates for each axis
                 axis_feedrates = {

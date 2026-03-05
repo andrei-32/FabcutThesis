@@ -50,8 +50,8 @@ class Config:
         
         # Motor Direction Configuration
         self.direction_inverted = {
-            'X': True,    # X axis inverted (bit 0 of $3=11)
-            'Y': True,   # Y axis NOT inverted - TEST THIS
+            'X': False,   # X axis NOT inverted - TEST THIS
+            'Y': True,    # Y axis inverted (bit 1 of $3=11)
             'Z': False,   # Z axis not inverted (bit 2 of $3=11)
             'A': True,    # A axis inverted (bit 3 of $3=11)
         }
