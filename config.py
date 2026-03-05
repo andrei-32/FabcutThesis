@@ -51,9 +51,9 @@ class Config:
         # Motor Direction Configuration
         self.direction_inverted = {
             'X': False,   # X axis NOT inverted - TEST THIS
-            'Y': True,    # Y axis inverted (bit 1 of $3=11)
+            'Y': False,    # Y axis inverted (bit 1 of $3=11)
             'Z': False,   # Z axis not inverted (bit 2 of $3=11)
-            'A': True,    # A axis inverted (bit 3 of $3=11)
+            'A': False,    # A axis inverted (bit 3 of $3=11)
         }
         
         # Work Area Configuration

@@ -626,8 +626,8 @@ class GrblMotorController:
         if axis not in "XYZA":
             raise ValueError("Invalid axis")
         
-        # GRBL jog commands are inherently relative, no G91 needed
-        command = f"$J={axis}{delta:.3f} F{feedrate}"
+        # GRBL jog commands are inherently relative
+        command = f"$J=G91 {axis}{delta:.3f} F{feedrate}"
         if self.debug_mode:
             print(f"[GRBL DEBUG] Sending jog command: {command}")
         self.send(command)
