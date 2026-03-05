@@ -50,10 +50,10 @@ class Config:
         
         # Motor Direction Configuration
         self.direction_inverted = {
-            'X': False,   # Adjust if needed
-            'Y': False,   # Adjust if needed
-            'Z': False,   # Adjust if needed
-            'A': False,   # Adjust if needed (rotation axis)
+            'X': True,    # X axis inverted (bit 0 of $3=11)
+            'Y': True,    # Y axis inverted (bit 1 of $3=11)
+            'Z': False,   # Z axis not inverted (bit 2 of $3=11)
+            'A': True,    # A axis inverted (bit 3 of $3=11)
         }
         
         # Work Area Configuration
