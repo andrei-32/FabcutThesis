@@ -48,6 +48,13 @@ class Config:
             'A': 254,     # 10 steps/mm * 25.4 mm/inch (rotation axis)
         }
         
+        # Motor Direction Configuration
+        self.direction_inverted = {
+            'X': True,    # X axis inverted (bit 0 of $3=11)
+            'Y': True,   # Y axis NOT inverted - TEST THIS
+            'Z': False,   # Z axis not inverted (bit 2 of $3=11)
+            'A': True,    # A axis inverted (bit 3 of $3=11)
+        }
         
         # Work Area Configuration
         self.work_area = WorkArea(x=30, y=30)  # 30" x 30" work area (matches APP_CONFIG)
