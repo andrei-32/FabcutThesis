@@ -2577,28 +2577,29 @@ class FabricCNCApp:
             
         new_pos = current_pos[pos_axis] + delta
         
+        # TEMPORARY: Disable ALL bounds checking for testing without homing
         # Bounds checking
-        if axis == 'X':
-            if new_pos < 0:
-                logger.warning(f"X jog blocked: would move to {new_pos:.3f} (min: 0)")
-                return
-            elif new_pos > config.APP_CONFIG['X_MAX_INCH']:
-                logger.warning(f"X jog blocked: would move to {new_pos:.3f} (max: {config.APP_CONFIG['X_MAX_INCH']})")
-                return
-        elif axis == 'Y':
-            if new_pos < 0:
-                logger.warning(f"Y jog blocked: would move to {new_pos:.3f} (min: 0)")
-                return
-            elif new_pos > config.APP_CONFIG['Y_MAX_INCH']:
-                logger.warning(f"Y jog blocked: would move to {new_pos:.3f} (max: {config.APP_CONFIG['Y_MAX_INCH']})")
-                return
-        elif axis == 'Z':
-            if new_pos > 0:
-                logger.warning(f"Z jog blocked: would move to {new_pos:.3f} (max: 0)")
-                return
-        elif axis == 'A':
-            # Allow continuous rotation - remove bounds checking for A-axis
-            pass
+        # if axis == 'X':
+        #     if new_pos < 0:
+        #         logger.warning(f"X jog blocked: would move to {new_pos:.3f} (min: 0)")
+        #         return
+        #     elif new_pos > config.APP_CONFIG['X_MAX_INCH']:
+        #         logger.warning(f"X jog blocked: would move to {new_pos:.3f} (max: {config.APP_CONFIG['X_MAX_INCH']})")
+        #         return
+        # elif axis == 'Y':
+        #     if new_pos < 0:
+        #         logger.warning(f"Y jog blocked: would move to {new_pos:.3f} (min: 0)")
+        #         return
+        #     elif new_pos > config.APP_CONFIG['Y_MAX_INCH']:
+        #         logger.warning(f"Y jog blocked: would move to {new_pos:.3f} (max: {config.APP_CONFIG['Y_MAX_INCH']})")
+        #         return
+        # elif axis == 'Z':
+        #     if new_pos > 0:
+        #         logger.warning(f"Z jog blocked: would move to {new_pos:.3f} (max: 0)")
+        #         return
+        # elif axis == 'A':
+        #     # Allow continuous rotation - remove bounds checking for A-axis
+        #     pass
         
         # No axis mapping needed - GUI and GRBL both use 'A'
         grbl_axis = axis
