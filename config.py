@@ -32,31 +32,28 @@ class Config:
     
     def __init__(self):
         """Initialize configuration with all values directly in code."""
-        # GPIO Pin Configuration
+        # GPIO Pin Configuration (RP2040 based on generic_map_4axis.h firmware)
         self.gpio_pins = {
-            'X': {'DIR': 23, 'STEP': 24, 'EN': 9, 'HALL': 16},  # X hall sensor on pin 16
-            'Y1': {'DIR': 27, 'STEP': 22, 'EN': 17, 'HALL': 1},  # Left Y motor hall sensor on pin 1
-            'Y2': {'DIR': 5, 'STEP': 6, 'EN': 10, 'HALL': 20},  # Right Y motor hall sensor on pin 20
-            'Z_LIFT': {'DIR': 7, 'STEP': 18, 'EN': 8, 'HALL': 25},  # Z hall sensor on pin 25
-            'A': {'DIR': 19, 'STEP': 26, 'EN': 13, 'HALL': 12},  # A hall sensor on pin 12
+            'X': {'STEP': 2, 'DIR': 6, 'EN': 10, 'LIMIT': 11},    # From generic_map_4axis.h
+            'Y': {'STEP': 3, 'DIR': 7, 'EN': 10, 'LIMIT': 12},    # From generic_map_4axis.h
+            'Z': {'STEP': 4, 'DIR': 8, 'EN': 10, 'LIMIT': 13},    # From generic_map_4axis.h
+            'A': {'STEP': 5, 'DIR': 9, 'EN': 10, 'LIMIT': 14},    # From generic_map_4axis.h (rotation/4th axis)
         }
         
         # Motor Steps Configuration (steps per inch)
         self.steps_per_inch = {
-            'X': 2032,  # 80 steps/mm * 25.4 mm/inch
-            'Y1': 2032,  # 80 steps/mm * 25.4 mm/inch
-            'Y2': 2032,  # 80 steps/mm * 25.4 mm/inch
-            'Z_LIFT': 10160,  # 400 steps/mm * 25.4 mm/inch
-            'A': 254,  # 10 steps/mm * 25.4 mm/inch
+            'X': 2032,    # 80 steps/mm * 25.4 mm/inch
+            'Y': 2032,    # 80 steps/mm * 25.4 mm/inch
+            'Z': 10160,   # 400 steps/mm * 25.4 mm/inch
+            'A': 254,     # 10 steps/mm * 25.4 mm/inch (rotation axis)
         }
         
         # Motor Direction Configuration
         self.direction_inverted = {
-            'X': True,  # Invert X direction to fix flipped axis
-            'Y1': True,  # Invert Y1 to fix Y direction
-            'Y2': False,  # Keep Y2 normal (opposite of Y1 for sync)
-            'Z_LIFT': False,
-            'A': True,  # Invert direction to fix one-way rotation issue
+            'X': False,   # Adjust if needed
+            'Y': False,   # Adjust if needed
+            'Z': False,   # Adjust if needed
+            'A': False,   # Adjust if needed (rotation axis)
         }
         
         # Work Area Configuration

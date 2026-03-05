@@ -1,50 +1,66 @@
 # Fabric CNC - Raspberry Pi Control System
 
-A complete CNC fabric cutting machine control system designed specifically for Raspberry Pi 4. This system provides motor control, DXF file processing, toolpath generation, and a comprehensive GUI for machine operation.
+A complete CNC fabric cutting machine control system that integrates an RP2040 microcontroller (running grblHAL firmware) with a Raspberry Pi 4 host computer. This system provides motor control, DXF file processing, toolpath generation, and a comprehensive GUI for machine operation.
 
 ## Features
 
-- **Motor Control**: Full control of X, Y, Z, and rotation axes with stepper motors
-- **Homing System**: EMI-resistant hall effect sensor homing with verification
+- **RP2040 Motor Control**: Full control of X, Y, Z, and rotation (A) axes with stepper motors via RP2040 microcontroller
+- **Homing System**: Limit switch powered homing with verification
 - **DXF Processing**: Import and process DXF files for cutting patterns
 - **Toolpath Generation**: Automatic toolpath generation from DXF entities
 - **GUI Interface**: Tkinter-based interface with real-time position display
-- **Raspberry Pi Optimized**: Designed specifically for Raspberry Pi GPIO control
-- **Simulation Mode**: Safe development and testing on non-Raspberry Pi systems
+- **grblHAL Firmware**: Uses generic_map_4axis.h firmware for motor control
+- **Simulation Mode**: Safe development and testing without hardware
 
 ## Hardware Requirements
 
-- **Raspberry Pi 4** (recommended) or Raspberry Pi 3B+
-- **Stepper Motors**: 5 stepper motors (X, Y1, Y2, Z_LIFT, A)
-- **Motor Drivers**: TB6600 or similar stepper motor drivers
-- **Hall Effect Sensors**: NJK-5002C for homing (5 sensors)
+- **RP2040 Microcontroller** (e.g., Raspberry Pi Pico) running generic_map_4axis.h firmware
+- **Stepper Motors**: 4 stepper motors (X, Y, Z, A rotation axis)
+- **Motor Drivers**: TB6600 or similar stepper motor drivers (STEP/DIR interface)
+- **Homing Switches**: Limit switches or hall effect sensors for XYZ axes
 - **Power Supply**: 5V for logic, 12-24V for motors
-- **GPIO Connections**: See pinout below
+- **Raspberry Pi 4** (host computer) - for running the control application and GUI
 
-## GPIO Pin Configuration
+## Firmware
 
-| Component | Pin | Function |
-|-----------|-----|----------|
-| X Motor | GPIO 5 | STEP |
-| X Motor | GPIO 6 | DIR |
-| X Motor | GPIO 13 | ENABLE |
-| X Motor | GPIO 20 | HALL Sensor |
-| Y1 Motor | GPIO 10 | STEP |
-| Y1 Motor | GPIO 9 | DIR |
-| Y1 Motor | GPIO 11 | ENABLE |
-| Y1 Motor | GPIO 21 | HALL Sensor |
-| Y2 Motor | GPIO 17 | STEP |
-| Y2 Motor | GPIO 27 | DIR |
-| Y2 Motor | GPIO 22 | ENABLE |
-| Y2 Motor | GPIO 16 | HALL Sensor |
-| Z_LIFT | GPIO 12 | STEP |
-| Z_LIFT | GPIO 11 | DIR |
-| Z_LIFT | GPIO 13 | ENABLE |
-| Z_LIFT | GPIO 22 | HALL Sensor |
-| A | GPIO 15 | STEP |
-| A | GPIO 14 | DIR |
-| A | GPIO 16 | ENABLE |
-| A | GPIO 23 | HALL Sensor |
+The RP2040 microcontroller runs the **grblHAL firmware** with the **generic_map_4axis.h** pin configuration. This firmware:
+
+- Controls stepper motors with STEP/DIR signals
+- Implements hard limit homing on X, Y, Z axes
+- Supports spindle and coolant control outputs
+- Provides probe and reset/estop inputs
+- Uses PIO (Programmable I/O) for precise step signal generation
+
+**Pin Configuration File**: `generic_map_4axis.h` - defines all GPIO pin mappings for the RP2040
+
+## GPIO Pin Configuration (RP2040 based on generic_map_4axis.h)
+
+Pin configuration matching the RP2040 firmware (Raspberry Pi Pico or similar):
+
+| Axis | Function | GPIO Pin | Notes |
+|------|----------|----------|-------|
+| X | STEP | 2 | Base step pin (PIO controlled) |
+| X | DIRECTION | 6 | Direction control |
+| X | LIMIT | 11 | Homing limit switch |
+| Y | STEP | 3 | Base step pin (PIO controlled) |
+| Y | DIRECTION | 7 | Direction control |
+| Y | LIMIT | 12 | Homing limit switch |
+| Z | STEP | 4 | Base step pin (PIO controlled) |
+| Z | DIRECTION | 8 | Direction control |
+| Z | LIMIT | 13 | Homing limit switch |
+| A | STEP | 5 | Rotation axis (4th axis) |
+| A | DIRECTION | 9 | Rotation direction |
+| A | LIMIT | 14 | Optional homing switch |
+| All Motors | ENABLE | 10 | Shared stepper enable pin |
+| Probe | INPUT | 22 | Probe/touch sensor input |
+| Reset/EStop | INPUT | 18 | Reset button input |
+| Feed Hold | INPUT | 19 | Feed hold button input |
+| Cycle Start | INPUT | 20 | Cycle start button input |
+| Spindle PWM | OUTPUT | 15 | Spindle speed control (PWM) |
+| Spindle DIR | OUTPUT | 27 | Spindle direction control |
+| Spindle EN | OUTPUT | 26 | Spindle enable signal |
+| Coolant Flood | OUTPUT | 16 | Coolant flood control |
+| Coolant Mist | OUTPUT | 17 | Coolant mist control |
 
 ## Quick Installation
 
