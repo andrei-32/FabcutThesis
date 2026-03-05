@@ -542,7 +542,7 @@ class GrblMotorController:
             except Exception as e:
                 if self.running:
                     logger.warning(f"Serial poll error in background thread: {e}")
-            time.sleep(0.2)
+            time.sleep(1.0)  # Reduced frequency to once per second
 
     def _parse_status(self, line):
         # Parse GRBL state from status line (e.g., <Idle|WPos:0,0,0,0|...)

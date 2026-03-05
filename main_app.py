@@ -236,7 +236,6 @@ class RealMotorController:
             clamped_val = self._clamp(axis, target_val)
             actual_delta = clamped_val - current_val
             
-            
             if abs(actual_delta) > 1e-6:
                 # Use specified jog feedrates for each axis
                 axis_feedrates = {
@@ -281,10 +280,10 @@ class RealMotorController:
         try:
             x, y, z, a = self.motor_controller.get_position()
             pos = {
-                'X': x / 25.4,  # Convert mm to inches
-                'Y': y / 25.4,  # Convert mm to inches
-                'Z': z / 25.4,  # Convert mm to inches
-                'A': (a / 25.4) * 360.0  # A-axis: convert mm to inches, then inches to degrees (1 inch = 360 degrees)
+                'X': x,  # Already in inches (G20 set)
+                'Y': y,  # Already in inches (G20 set)
+                'Z': z,  # Already in inches (G20 set)
+                'A': a * 360.0  # A-axis: inches to degrees (1 inch = 360 degrees)
             }
             return pos
         except Exception as e:
@@ -354,19 +353,19 @@ class RealMotorController:
         
         
         # Use G0 (rapid) movement to move to absolute position
-        # Convert from inches to mm for GRBL
-        x_mm = x * 25.4 if x is not None else None
-        y_mm = y * 25.4 if y is not None else None
-        z_mm = z * 25.4 if z is not None else None
+        # GRBL is in inches mode (G20), so send coordinates in inches
+        x_in = x if x is not None else None
+        y_in = y if y is not None else None
+        z_in = z if z is not None else None
         
         # Build G0 command
         cmd_parts = ["G0"]
-        if x_mm is not None:
-            cmd_parts.append(f"X{x_mm:.3f}")
-        if y_mm is not None:
-            cmd_parts.append(f"Y{y_mm:.3f}")
-        if z_mm is not None:
-            cmd_parts.append(f"Z{z_mm:.3f}")
+        if x_in is not None:
+            cmd_parts.append(f"X{x_in:.3f}")
+        if y_in is not None:
+            cmd_parts.append(f"Y{y_in:.3f}")
+        if z_in is not None:
+            cmd_parts.append(f"Z{z_in:.3f}")
         if rot is not None:
             cmd_parts.append(f"A{rot:.3f}")
         
@@ -381,19 +380,19 @@ class RealMotorController:
     def move_coordinated(self, x_distance_in=0, y_distance_in=0, z_distance_in=0, rot_distance_deg=0):
         """Execute coordinated movement across multiple axes using relative G1 movement."""
         try:
-            # Convert inch distances to mm for GRBL
-            x_mm = x_distance_in * 25.4
-            y_mm = y_distance_in * 25.4
-            z_mm = z_distance_in * 25.4
+            # GRBL is in inches mode, so use inch distances directly
+            x_in = x_distance_in
+            y_in = y_distance_in
+            z_in = z_distance_in
             
             # Build G1 relative movement command
             cmd_parts = ["G91", "G1"]  # G91 = relative mode, G1 = linear interpolation
-            if abs(x_mm) > 1e-6:
-                cmd_parts.append(f"X{x_mm:.3f}")
-            if abs(y_mm) > 1e-6:
-                cmd_parts.append(f"Y{y_mm:.3f}")
-            if abs(z_mm) > 1e-6:
-                cmd_parts.append(f"Z{z_mm:.3f}")
+            if abs(x_in) > 1e-6:
+                cmd_parts.append(f"X{x_in:.3f}")
+            if abs(y_in) > 1e-6:
+                cmd_parts.append(f"Y{y_in:.3f}")
+            if abs(z_in) > 1e-6:
+                cmd_parts.append(f"Z{z_in:.3f}")
             if abs(rot_distance_deg) > 1e-6:
                 cmd_parts.append(f"A{rot_distance_deg:.3f}")
             
