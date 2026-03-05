@@ -240,10 +240,10 @@ class RealMotorController:
             if abs(actual_delta) > 1e-6:
                 # Use specified jog feedrates for each axis
                 axis_feedrates = {
-                    'X': 3000,   # High speed for X-axis
-                    'Y': 3000,   # High speed for Y-axis
-                    'Z': 500,    # Medium speed for Z-axis
-                    'A': 500     # Medium speed for rotation axis
+                    'X': 300,    # Temporary safer speed for X-axis test
+                    'Y': 300,    # Temporary safer speed for Y-axis test
+                    'Z': 100,    # Temporary safer speed for Z-axis test
+                    'A': 100     # Temporary safer speed for rotation axis test
                 }
                 feedrate = axis_feedrates.get(axis, 100)
                 
@@ -2479,6 +2479,10 @@ class FabricCNCApp:
         """Jog with bounds checking to prevent moves outside machine limits."""
         if not MOTOR_IMPORTS_AVAILABLE or SIMULATION_MODE:
             return
+
+        # Temporary test window to allow limited negative XY motion during axis mapping.
+        test_min_x = -1.0
+        test_min_y = -1.0
         
         # Get current position
         current_pos = self.motor_ctrl.get_position()
@@ -2498,15 +2502,19 @@ class FabricCNCApp:
         
         # Bounds checking
         if axis == 'X':
-            if new_pos < 0:
-                logger.warning(f"X jog blocked: would move to {new_pos:.3f} (min: 0)")
+            if new_pos < test_min_x:
+                logger.warning(
+                    f"X jog blocked: would move to {new_pos:.3f} (min: {test_min_x})"
+                )
                 return
             elif new_pos > config.APP_CONFIG['X_MAX_INCH']:
                 logger.warning(f"X jog blocked: would move to {new_pos:.3f} (max: {config.APP_CONFIG['X_MAX_INCH']})")
                 return
         elif axis == 'Y':
-            if new_pos < 0:
-                logger.warning(f"Y jog blocked: would move to {new_pos:.3f} (min: 0)")
+            if new_pos < test_min_y:
+                logger.warning(
+                    f"Y jog blocked: would move to {new_pos:.3f} (min: {test_min_y})"
+                )
                 return
             elif new_pos > config.APP_CONFIG['Y_MAX_INCH']:
                 logger.warning(f"Y jog blocked: would move to {new_pos:.3f} (max: {config.APP_CONFIG['Y_MAX_INCH']})")
