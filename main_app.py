@@ -226,19 +226,19 @@ class RealMotorController:
 
     def jog(self, axis, delta):
         try:
-            
+
+            # For jogging, don't clamp - allow manual movement anywhere within machine limits
             # Get current position from GRBL
             current_pos = self.get_position()
             current_val = current_pos.get(axis, 0.0)
-            
-            # Calculate target and clamp
+
+            # Calculate target (don't clamp for jogging)
             target_val = current_val + delta
-            clamped_val = self._clamp(axis, target_val)
-            actual_delta = clamped_val - current_val
-            
+            actual_delta = delta  # Use the requested delta directly
+
             # Debug logging
-            print(f"[JOG DEBUG] {axis}: current={current_val:.3f}, delta={delta:.3f}, target={target_val:.3f}, clamped={clamped_val:.3f}, actual_delta={actual_delta:.3f}")
-            
+            print(f"[JOG DEBUG] {axis}: current={current_val:.3f}, delta={delta:.3f}, target={target_val:.3f}, actual_delta={actual_delta:.3f}")
+
             if abs(actual_delta) > 1e-6:
                 # Use specified jog feedrates for each axis
                 axis_feedrates = {
@@ -254,6 +254,15 @@ class RealMotorController:
                 
                 self.motor_controller.jog(axis, delta_grbl, feedrate)
                 time.sleep(0.2)  # Wait for GRBL to process
+                
+                # Update work coordinates to match machine position after jogging
+                # This ensures the UI position stays in sync
+                try:
+                    # Get the new machine position and update work coordinates
+                    self.motor_controller.send("?")  # Request status update
+                    time.sleep(0.1)
+                except Exception as e:
+                    logger.warning(f"Failed to update position after jog: {e}")
                     
             
         except Exception as e:
