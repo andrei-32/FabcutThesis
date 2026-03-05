@@ -1,5 +1,5 @@
 # Core dependencies for Fabric CNC
-# RPi.GPIO>=0.7.1  # Only works on Raspberry Pi hardware - comment out for Windows dev
+RPi.GPIO>=0.7.1  # Only works on Raspberry Pi hardware - comment out for Windows dev
 ezdxf>=1.0.0
 numpy>=1.21.0
 customtkinter>=5.0.0
