@@ -236,6 +236,9 @@ class RealMotorController:
             clamped_val = self._clamp(axis, target_val)
             actual_delta = clamped_val - current_val
             
+            # Debug logging
+            print(f"[JOG DEBUG] {axis}: current={current_val:.3f}, delta={delta:.3f}, target={target_val:.3f}, clamped={clamped_val:.3f}, actual_delta={actual_delta:.3f}")
+            
             if abs(actual_delta) > 1e-6:
                 # Use specified jog feedrates for each axis
                 axis_feedrates = {
