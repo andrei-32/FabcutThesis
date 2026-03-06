@@ -197,7 +197,7 @@ class RealMotorController:
             raise ImportError("GRBL motor controller not available")
         
         # Use auto-detection by passing no port parameter
-        self.motor_controller = GrblMotorController(debug_mode=True)
+        self.motor_controller = GrblMotorController(debug_mode=False)
         self.lock = threading.Lock()
         self.is_homing = False
         # No internal position tracking - GRBL is single source of truth
