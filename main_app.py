@@ -197,7 +197,7 @@ class RealMotorController:
             raise ImportError("GRBL motor controller not available")
         
         # Use auto-detection by passing no port parameter
-        self.motor_controller = GrblMotorController()
+        self.motor_controller = GrblMotorController(debug_mode=True)
         self.lock = threading.Lock()
         self.is_homing = False
         # No internal position tracking - GRBL is single source of truth
@@ -2569,6 +2569,8 @@ class FabricCNCApp:
         
         # Position data uses the same axis names now
         pos_axis = axis
+        
+        logger.info(f"[JOG DEBUG] Jogging axis {axis} by {delta:.3f}, current_pos={current_pos}")
             
         # Check if position data has the requested axis
         if pos_axis not in current_pos:
@@ -2603,7 +2605,8 @@ class FabricCNCApp:
         
         # No axis mapping needed - GUI and GRBL both use 'A'
         grbl_axis = axis
-            
+        
+        logger.info(f"[JOG DEBUG] Sending jog command: axis={grbl_axis}, delta={delta:.3f}")
         
         # Perform the jog if within bounds
         self.motor_ctrl.jog(grbl_axis, delta)
