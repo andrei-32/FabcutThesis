@@ -352,7 +352,7 @@ class GrblMotorController:
                 "$39": "1",       # Enable legacy RT commands
                 "$40": "0",       # Limit/control pins pull-up disable
                 "$43": "1",       # Homing passes
-                "$44": "4",       # Homing cycle mask
+                "$44": "7",       # Homing cycle mask (X=1, Y=2, Z=4: 1+2+4=7 home X,Y,Z together)
                 "$45": "11",      # Homing cycle pulloff mask
                 "$46": "0",       # Homing cycle allow manual
                 "$47": "0",       # Homing cycle mpos set
