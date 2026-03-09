@@ -2492,6 +2492,11 @@ class FabricCNCApp:
         
         # Position data uses the same axis names now
         pos_axis = axis
+        
+        # Scale down A-axis jog for finer control (1/36th of regular jog size)
+        # This converts 1.0 inch jog to ~10 degrees instead of 360 degrees
+        if axis == 'A':
+            delta = delta / 36.0
             
         # Check if position data has the requested axis
         if pos_axis not in current_pos:
@@ -2531,9 +2536,11 @@ class FabricCNCApp:
         # No axis mapping needed - GUI and GRBL both use 'A'
         grbl_axis = axis
             
+        # Use slower feedrate for A-axis for more controlled rotation
+        feedrate = 30 if axis == 'A' else 100
         
         # Perform the jog if within bounds
-        self.motor_ctrl.jog(grbl_axis, delta)
+        self.motor_ctrl.jog(grbl_axis, delta, feedrate)
         # Position update loop will handle canvas redraw automatically
 
 

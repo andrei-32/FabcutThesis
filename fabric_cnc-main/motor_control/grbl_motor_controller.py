@@ -1229,13 +1229,7 @@ class GrblMotorController:
 
     def get_position(self):
         with self.status_lock:
-            # Convert from mm (GRBL native) to inches for display
-            return {
-                'X': self.position[0] / 25.4,
-                'Y': self.position[1] / 25.4,
-                'Z': self.position[2] / 25.4,
-                'A': (self.position[3] / 25.4) * 360.0  # Convert mm to inches, then inches to degrees
-            }
+            return tuple(self.position)
 
     def close(self):
         """Safely close the GRBL motor controller connection."""
