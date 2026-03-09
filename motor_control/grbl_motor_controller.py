@@ -691,6 +691,14 @@ class GrblMotorController:
 
         return False, "timeout"
 
+    def _drain_ack_queue(self):
+        """Drain stale responses so the next command gets a fresh acknowledgment."""
+        try:
+            while True:
+                self.ack_queue.get_nowait()
+        except queue.Empty:
+            pass
+
     def jog(self, axis, delta, feedrate=100):
         if axis not in "XYZA":
             raise ValueError("Invalid axis")
@@ -728,19 +736,39 @@ class GrblMotorController:
         for axis_name, axis_mask in axis_masks:
             logger.info(f"Homing {axis_name} axis...")
 
-            self.send(f"$44={axis_mask}")
-            ok, response = self._send_and_wait_response(timeout=3.0)
-            if not ok:
-                raise RuntimeError(f"Failed to set homing mask for {axis_name}: {response}")
+            axis_homed = False
+            last_error = "unknown"
+            for attempt in range(1, 3):
+                self._drain_ack_queue()
 
-            self.send("$H")
-            ok, response = self._send_and_wait_response(timeout=20.0)
-            self.send_immediate("?")
-            time.sleep(0.5)
-            if not ok:
-                raise RuntimeError(f"{axis_name} homing failed: {response}")
+                # Clear alarm/lockout before each homing attempt.
+                self.send("$X")
+                time.sleep(0.2)
 
-            logger.info(f"{axis_name} homing complete. State={self.machine_state}")
+                self.send(f"$44={axis_mask}")
+                ok, response = self._send_and_wait_response(timeout=3.0)
+                if not ok:
+                    last_error = f"set mask failed: {response}"
+                    logger.warning(f"{axis_name} attempt {attempt}: {last_error}")
+                    continue
+
+                self.send("$H")
+                ok, response = self._send_and_wait_response(timeout=25.0)
+                self.send_immediate("?")
+                time.sleep(0.5)
+                if ok:
+                    axis_homed = True
+                    logger.info(f"{axis_name} homing complete. State={self.machine_state}")
+                    break
+
+                last_error = response
+                logger.warning(f"{axis_name} attempt {attempt} failed: {response}")
+                if response in ("error:9", "error:79"):
+                    self.send("$X")
+                    time.sleep(0.3)
+
+            if not axis_homed:
+                raise RuntimeError(f"{axis_name} homing failed after retries: {last_error}")
 
         # Restore profile default mask after sequential homing.
         self.send("$44=7")
