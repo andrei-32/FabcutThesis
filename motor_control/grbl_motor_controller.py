@@ -683,6 +683,20 @@ class GrblMotorController:
     def home_all(self):
         """Home all axes using $H command."""
         logger.info("Starting home all axes sequence...")
+        
+        # Clear any alarms first
+        if self.machine_state == "Alarm":
+            logger.info("Clearing alarm state before homing...")
+            self.send("$X")
+            time.sleep(1)
+        
+        # Ensure homing is enabled
+        logger.info("Enabling homing cycle ($22=1)...")
+        self.send("$22=1")
+        time.sleep(0.5)
+        
+        # Send homing command
+        logger.info("Sending $H command...")
         self.send("$H")
         
         # Wait for homing to complete - this is critical timing
