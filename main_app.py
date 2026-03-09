@@ -2616,8 +2616,12 @@ class FabricCNCApp:
         # Use slower feedrate for A-axis for more controlled rotation
         feedrate = 30 if axis == 'A' else 100
         
-        # Perform the jog if within bounds
-        self.motor_ctrl.jog(grbl_axis, delta, feedrate)
+        # Perform the jog if within bounds.
+        # Compatibility: some deployed controller versions only accept (axis, delta).
+        try:
+            self.motor_ctrl.jog(grbl_axis, delta, feedrate)
+        except TypeError:
+            self.motor_ctrl.jog(grbl_axis, delta)
         # Position update loop will handle canvas redraw automatically
 
 
