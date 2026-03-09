@@ -2497,9 +2497,9 @@ class FabricCNCApp:
         pos_axis = axis
         
         # Scale down A-axis jog for finer control.
-        # Calibrated from field measurement: ~170 deg/click targetting ~10 deg/click.
+        # Fine-tuned from 36-click test (~330 deg total, target 360 deg).
         if axis == 'A':
-            delta = delta / 612.0
+            delta = delta / 561.0
             
         # Check if position data has the requested axis
         if pos_axis not in current_pos:
