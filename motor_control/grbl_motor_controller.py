@@ -752,9 +752,9 @@ class GrblMotorController:
         self.send("$22=1")
         time.sleep(0.5)
         
-        # Temporarily enable hard limits so GRBL can read limit switches during homing
-        logger.info("Temporarily enabling hard limits ($21=1) for homing...")
-        self.send("$21=1")
+        # Keep hard limits disabled during homing to avoid false Alarm trips at switch hit/pull-off.
+        logger.info("Ensuring hard limits are disabled during homing ($21=0)...")
+        self.send("$21=0")
         time.sleep(0.5)
         
         # Home axes sequentially using mask + $H for better compatibility.
@@ -844,14 +844,8 @@ class GrblMotorController:
         
         logger.info(f"Home all completed - work offset set to {self.work_offset}")
         
-        # Disable hard limits again (prevent A-axis limit issues during normal operation)
-        logger.info("Disabling hard limits ($21=0) after homing...")
-        self.send("$21=0")
-        time.sleep(0.5)
-        
-        # Clear any alarm from disabling limits
-        self.send("$X")
-        time.sleep(0.5)
+        # Keep hard limits disabled after homing (current machine profile).
+        logger.info("Hard limits remain disabled after homing ($21=0).")
         
         # Set GRBL work coordinate system to origin at current position
         # This tells GRBL that the current (homed) position should be (0,0,0,0) in work coordinates
