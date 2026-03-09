@@ -506,7 +506,9 @@ class GrblMotorController:
                                                 time.sleep(1)
                                                 self.send("$X")  # Try unlock after reset
                                 else:
-                                    logger.info(f"GRBL: {decoded}")
+                                    # Avoid terminal spam from routine controller chatter.
+                                    if decoded.strip():
+                                        logger.debug(f"GRBL: {decoded}")
                                     # Send non-error responses to GUI if callback is set
                                     if self.response_callback:
                                         self.response_callback(decoded)
