@@ -470,6 +470,8 @@ class GrblMotorController:
             try:
                 if self.serial and self.serial.is_open and self.serial.in_waiting:
                     buffer += self.serial.read(self.serial.in_waiting)
+                    # Normalize CR/LF variants so status frames are parsed on all firmware builds.
+                    buffer = buffer.replace(b'\r', b'\n')
                     lines = buffer.split(b'\n')
                     buffer = lines[-1]  # keep incomplete line
                     for line in lines[:-1]:
@@ -538,7 +540,8 @@ class GrblMotorController:
         while self.running:
             try:
                 if self.serial and self.serial.is_open:
-                    self.serial.write(b"?\n")
+                    # '?' is a realtime status command and should be sent without newline.
+                    self.serial.write(b"?")
             except Exception as e:
                 if self.running:
                     logger.warning(f"Serial poll error in background thread: {e}")

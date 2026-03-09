@@ -287,14 +287,21 @@ class RealMotorController:
     def get_position(self):
         # GRBL is the ONLY source of truth for position
         try:
-            x, y, z, a = self.motor_controller.get_position()
-            pos = {
-                'X': x,  # Already in inches (G20 set)
-                'Y': y,  # Already in inches (G20 set)
-                'Z': z,  # Already in inches (G20 set)
-                'A': a * 360.0  # A-axis: inches to degrees (1 inch = 360 degrees)
-            }
-            return pos
+            raw_pos = self.motor_controller.get_position()
+
+            # Support both controller formats:
+            # - tuple/list: (X, Y, Z, A)
+            # - dict: {'X': ..., 'Y': ..., 'Z': ..., 'A': ...}
+            if isinstance(raw_pos, dict):
+                x = raw_pos.get('X', 0.0)
+                y = raw_pos.get('Y', 0.0)
+                z = raw_pos.get('Z', 0.0)
+                a = raw_pos.get('A', 0.0)
+            else:
+                x, y, z, a = raw_pos
+
+            # GRBL is configured to inch mode (G20), so use values directly.
+            return {'X': x, 'Y': y, 'Z': z, 'A': a}
         except Exception as e:
             # Return zeros if GRBL unavailable
             return {'X': 0.0, 'Y': 0.0, 'Z': 0.0, 'A': 0.0}
