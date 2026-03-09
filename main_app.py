@@ -859,10 +859,10 @@ class FabricCNCApp:
         motor_section.grid_rowconfigure(11, weight=1)  # Z limit value display row
         
         # Arrow buttons - stacked layout with equal widths and better spacing
-        self._add_compact_jog_button(motor_section, "▲", lambda: self._jog('Y', +self.jog_size)).grid(row=1, column=0, columnspan=2, padx=8, pady=3, sticky="nsew")
+        self._add_compact_jog_button(motor_section, "▲", lambda: self._jog('Y', -self.jog_size)).grid(row=1, column=0, columnspan=2, padx=8, pady=3, sticky="nsew")
         self._add_compact_jog_button(motor_section, "◀", lambda: self._jog('X', -self.jog_size)).grid(row=2, column=0, padx=8, pady=3, sticky="nsew")
         self._add_compact_jog_button(motor_section, "▶", lambda: self._jog('X', +self.jog_size)).grid(row=2, column=1, padx=8, pady=3, sticky="nsew")
-        self._add_compact_jog_button(motor_section, "▼", lambda: self._jog('Y', -self.jog_size)).grid(row=3, column=0, columnspan=2, padx=8, pady=3, sticky="nsew")
+        self._add_compact_jog_button(motor_section, "▼", lambda: self._jog('Y', +self.jog_size)).grid(row=3, column=0, columnspan=2, padx=8, pady=3, sticky="nsew")
         # Z and A controls - compact
         self._add_compact_jog_button(motor_section, "Z+", lambda: self._jog('Z', +self.jog_size)).grid(row=4, column=0, padx=8, pady=3, sticky="nsew")
         self._add_compact_jog_button(motor_section, "Z-", lambda: self._jog('Z', -self.jog_size)).grid(row=4, column=1, padx=8, pady=3, sticky="nsew")
@@ -990,10 +990,10 @@ class FabricCNCApp:
             delta = self.jog_size
         elif key == 'Up':
             axis = 'Y'
-            delta = self.jog_size
+            delta = -self.jog_size
         elif key == 'Down':
             axis = 'Y'
-            delta = -self.jog_size
+            delta = self.jog_size
         elif key == 'Page_Up':
             axis = 'Z'
             delta = self.jog_size
