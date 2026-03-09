@@ -241,7 +241,7 @@ class RealMotorController:
                     'X': 3000,   # High speed for X-axis
                     'Y': 3000,   # High speed for Y-axis
                     'Z': 500,    # Medium speed for Z-axis
-                    'A': 500     # Medium speed for rotation axis
+                    'A': 30      # Very slow for rotation axis (conservative)
                 }
                 feedrate = axis_feedrates.get(axis, 100)
                 

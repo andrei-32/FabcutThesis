@@ -364,19 +364,19 @@ class GrblMotorController:
                 "$100": "20.32000",   # X steps/inch
                 "$101": "20.32000",   # Y steps/inch  
                 "$102": "200.00000",  # Z steps/inch
-                "$103": "20.000",  # A steps/inch
+                "$103": "20.00000",  # A steps/inch (calibrated; keep synced with both controller copies)
                 
                 # Maximum rates (inches/min) - Conservative speeds for safety
                 "$110": "2000.000",   # X max rate (reduced for controlled cutting)
                 "$111": "2000.000",   # Y max rate (reduced for controlled cutting)
                 "$112": "1000.000",   # Z max rate (conservative for safety)
-                "$113": "500.000",   # A max rate (reduced for controlled rotation)
+                "$113": "500.000",    # A max rate (conservative to avoid aggressive rotation)
                 
                 # Acceleration (inches/sec²) - Lower values for smoother, safer motion
                 "$120": "100.000",    # X acceleration (reduced for smoother moves)
                 "$121": "100.000",    # Y acceleration (reduced for smoother moves)
                 "$122": "50.000",     # Z acceleration (reduced for safer Z moves)
-                "$123": "25.000",     # A acceleration (reduced for smoother rotation)
+                "$123": "25.000",     # A acceleration (conservative for smoother rotation)
                 
                 # Maximum travel (mm for GRBL)
                 "$130": "1727.000",   # X max travel

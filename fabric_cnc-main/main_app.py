@@ -243,7 +243,7 @@ class RealMotorController:
                     'X': 300,    # Temporary safer speed for X-axis test
                     'Y': 300,    # Temporary safer speed for Y-axis test
                     'Z': 100,    # Temporary safer speed for Z-axis test
-                    'A': 100     # Temporary safer speed for rotation axis test
+                    'A': 30      # Very slow for rotation axis (conservative)
                 }
                 feedrate = axis_feedrates.get(axis, 100)
                 
