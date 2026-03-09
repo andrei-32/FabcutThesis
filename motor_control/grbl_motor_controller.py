@@ -319,7 +319,7 @@ class GrblMotorController:
                 "$2": "0",        # Step pulse invert
                 "$3": "10",       # Step direction invert (Y=2, A=8, total=10, X&Z not inverted)
                 "$4": "15",       # Step enable invert
-                "$5": "15",       # Limit pins invert
+                "$5": "0",        # Limit pins invert (0=no invert, try if switches are normally-open)
                 "$6": "0",        # Probe pin invert
                 "$9": "1",        # PWM spindle mode
                 "$10": "2",       # Status report options: WPos only (1=MPos, 2=WPos, 3=both)
@@ -350,7 +350,7 @@ class GrblMotorController:
                 "$36": "100.0",   # Spindle PWM max value
                 "$37": "0",       # Stepper deenergize mask
                 "$39": "1",       # Enable legacy RT commands
-                "$40": "0",       # Limit/control pins pull-up disable
+                "$40": "0",       # Limit/control pins pull-up ENABLED (0=enabled, 1=disabled)
                 "$43": "1",       # Homing passes
                 "$44": "7",       # Homing cycle mask (X=1, Y=2, Z=4: 1+2+4=7 home X,Y,Z together)
                 "$45": "11",      # Homing cycle pulloff mask
