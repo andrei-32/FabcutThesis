@@ -703,6 +703,8 @@ class GrblMotorController:
         """Wait until homing motion has started and returned to Idle."""
         start_time = time.time()
         saw_active_homing_state = False
+        state = "Unknown"
+        pins = ""
 
         while time.time() - start_time < timeout:
             self.send_immediate("?")
@@ -713,6 +715,19 @@ class GrblMotorController:
                 pins = getattr(self, 'last_limit_pins', "")
 
             if state in ("Alarm", "Unknown"):
+                # Some firmware enters Alarm right after a successful limit hit.
+                # Try one unlock/recheck path before declaring failure.
+                self.send("$X")
+                time.sleep(0.25)
+                self.send_immediate("?")
+                time.sleep(0.15)
+                with self.status_lock:
+                    recovered_state = self.machine_state
+                    recovered_pins = getattr(self, 'last_limit_pins', "")
+
+                if saw_active_homing_state and recovered_state == "Idle":
+                    return True, f"state={recovered_state}, pins={recovered_pins} (recovered from Alarm)"
+
                 return False, f"state={state}, pins={pins}"
 
             # Any non-idle/non-fault state indicates homing/motion is active.
