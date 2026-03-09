@@ -363,17 +363,17 @@ class GrblMotorController:
                 "$102": "200.00000",  # Z steps/inch
                 "$103": "254.00000",  # A steps/inch
                 
-                # Maximum rates (inches/min) - Realistic grblHAL limits
-                "$110": "6000.000",   # X max rate (increased for faster cutting)
-                "$111": "6000.000",   # Y max rate (increased for faster cutting)
-                "$112": "3000.000",   # Z max rate (keep conservative for safety)
-                "$113": "6000.000",   # A max rate (increased for faster rotation)
+                # Maximum rates (inches/min) - Conservative speeds for safety
+                "$110": "2000.000",   # X max rate (reduced for controlled cutting)
+                "$111": "2000.000",   # Y max rate (reduced for controlled cutting)
+                "$112": "1000.000",   # Z max rate (conservative for safety)
+                "$113": "2000.000",   # A max rate (reduced for controlled rotation)
                 
-                # Acceleration (inches/sec²) - Reduced for smoother motion
-                "$120": "300.000",    # X acceleration (reduced for smoother moves)
-                "$121": "300.000",    # Y acceleration (reduced for smoother moves)
-                "$122": "150.000",    # Z acceleration (reduced for smoother Z moves)
-                "$123": "150.000",    # A acceleration (reduced for smoother rotation)
+                # Acceleration (inches/sec²) - Lower values for smoother, safer motion
+                "$120": "100.000",    # X acceleration (reduced for smoother moves)
+                "$121": "100.000",    # Y acceleration (reduced for smoother moves)
+                "$122": "50.000",     # Z acceleration (reduced for safer Z moves)
+                "$123": "75.000",     # A acceleration (reduced for smoother rotation)
                 
                 # Maximum travel (mm for GRBL)
                 "$130": "1727.000",   # X max travel
@@ -1229,7 +1229,13 @@ class GrblMotorController:
 
     def get_position(self):
         with self.status_lock:
-            return tuple(self.position)
+            # Convert from mm (GRBL native) to inches for display
+            return {
+                'X': self.position[0] / 25.4,
+                'Y': self.position[1] / 25.4,
+                'Z': self.position[2] / 25.4,
+                'A': (self.position[3] / 25.4) * 360.0  # Convert mm to inches, then inches to degrees
+            }
 
     def close(self):
         """Safely close the GRBL motor controller connection."""
