@@ -46,6 +46,7 @@ class ToolpathGenerator:
         self.plunge_rate = plunge_rate
         self.current_z = safe_height  # Track current Z position
         self.current_a = 0.0  # Track current A position for continuous rotation
+        self.a_scaling_factor = 561.0  # Calibrated A-axis scaling (matches manual jog scaling)
         
     def generate_toolpath(self, shapes: Dict[str, List[Tuple[float, float]]]) -> str:
         """
@@ -398,6 +399,10 @@ class ToolpathGenerator:
         
         # Convert to inches: 1 inch = 360 degrees
         a_position_inches = adjusted_angle / 360.0
+        
+        # Apply calibrated scaling factor to match motor behavior
+        a_position_inches = a_position_inches / self.a_scaling_factor
+        
         
         # Round to 4 decimal places to reduce precision issues
         return round(a_position_inches, 4)
