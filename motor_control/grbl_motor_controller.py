@@ -371,13 +371,13 @@ class GrblMotorController:
                 "$110": "2000.000",   # X max rate (reduced for controlled cutting)
                 "$111": "2000.000",   # Y max rate (reduced for controlled cutting)
                 "$112": "1000.000",   # Z max rate (conservative for safety)
-                "$113": "500.000",    # A max rate (conservative to avoid aggressive rotation)
+                "$113": "50.000",     # A max rate (VERY conservative to prevent fast spinning)
                 
                 # Acceleration (inches/sec²) - Lower values for smoother, safer motion
                 "$120": "100.000",    # X acceleration (reduced for smoother moves)
                 "$121": "100.000",    # Y acceleration (reduced for smoother moves)
                 "$122": "50.000",     # Z acceleration (reduced for safer Z moves)
-                "$123": "25.000",     # A acceleration (conservative for smoother rotation)
+                "$123": "5.000",      # A acceleration (VERY conservative for smooth rotation)
                 
                 # Maximum travel (mm for GRBL)
                 "$130": "1727.000",   # X max travel

@@ -243,7 +243,7 @@ class RealMotorController:
                     'X': 300,    # Temporary safer speed for X-axis test
                     'Y': 300,    # Temporary safer speed for Y-axis test
                     'Z': 100,    # Temporary safer speed for Z-axis test
-                    'A': 30      # Very slow for rotation axis (conservative)
+                    'A': 10      # EXTREMELY slow for rotation axis
                 }
                 feedrate = axis_feedrates.get(axis, 100)
                 
@@ -2538,7 +2538,7 @@ class FabricCNCApp:
         grbl_axis = axis
             
         # Use slower feedrate for A-axis for more controlled rotation
-        feedrate = 30 if axis == 'A' else 100
+        feedrate = 10 if axis == 'A' else 100
         
         # Perform the jog if within bounds.
         # Compatibility: some deployed controller versions only accept (axis, delta).
