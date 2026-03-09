@@ -554,15 +554,18 @@ class GrblMotorController:
                 # GRBL doesn't explicitly report "homed" status, but Alarm state usually means not homed
                 self.is_homed = self.machine_state not in ["Alarm", "Unknown"]
         
-        # Try to parse work coordinates first (WPos), then fall back to machine coordinates (MPos)
-        wpos_match = re.search(r"WPos:([-\d.]+),([-\d.]+),([-\d.]+),([-\d.]+)", line)
-        mpos_match = re.search(r"MPos:([-\d.]+),([-\d.]+),([-\d.]+),([-\d.]+)", line)
+        # Try to parse work coordinates first (WPos), then fall back to machine coordinates (MPos).
+        # Some GRBL builds report XYZ only, others report XYZA.
+        wpos_match = re.search(r"WPos:([-\d.]+),([-\d.]+),([-\d.]+)(?:,([-\d.]+))?", line)
+        mpos_match = re.search(r"MPos:([-\d.]+),([-\d.]+),([-\d.]+)(?:,([-\d.]+))?", line)
         
         if wpos_match:
             # Use work coordinates directly
             with self.status_lock:
                 old_position = self.position.copy()
-                self.position = [float(wpos_match.group(i)) for i in range(1, 5)]
+                wpos = [float(wpos_match.group(i)) for i in range(1, 4)]
+                a_val = float(wpos_match.group(4)) if wpos_match.group(4) is not None else old_position[3]
+                self.position = [wpos[0], wpos[1], wpos[2], a_val]
                 if self.debug_mode:
                     print(f"[GRBL DEBUG] Raw position from GRBL (WPos): {self.position}")
                     
@@ -574,12 +577,18 @@ class GrblMotorController:
             # Convert machine coordinates to work coordinates using stored offsets
             with self.status_lock:
                 old_position = self.position.copy()
-                mpos = [float(mpos_match.group(i)) for i in range(1, 5)]
+                mxyz = [float(mpos_match.group(i)) for i in range(1, 4)]
+                ma = float(mpos_match.group(4)) if mpos_match.group(4) is not None else old_position[3]
+                mpos = [mxyz[0], mxyz[1], mxyz[2], ma]
                 
                 # Simple approach: always use work_offset if available
                 if hasattr(self, 'work_offset') and self.work_offset is not None:
-                    # Calculate work coordinates by subtracting the offset
-                    self.position = [mpos[i] - self.work_offset[i] for i in range(4)]
+                    # Calculate work coordinates by subtracting the offset.
+                    # Guard against older states where offset may only have XYZ.
+                    offset = list(self.work_offset)
+                    while len(offset) < 4:
+                        offset.append(0.0)
+                    self.position = [mpos[i] - offset[i] for i in range(4)]
                 else:
                     # No work offset - use machine coordinates directly
                     self.position = mpos
@@ -649,13 +658,19 @@ class GrblMotorController:
             
             # Parse the last received line to get machine coordinates directly
             if hasattr(self, '_last_status_line'):
-                mpos_match = re.search(r"MPos:([-\d.]+),([-\d.]+),([-\d.]+),([-\d.]+)", self._last_status_line)
+                mpos_match = re.search(r"MPos:([-\d.]+),([-\d.]+),([-\d.]+)(?:,([-\d.]+))?", self._last_status_line)
                 if mpos_match:
-                    current_machine_pos = [float(mpos_match.group(i)) for i in range(1, 5)]
+                    current_machine_pos = [
+                        float(mpos_match.group(1)),
+                        float(mpos_match.group(2)),
+                        float(mpos_match.group(3)),
+                    ]
+                    if mpos_match.group(4) is not None:
+                        current_machine_pos.append(float(mpos_match.group(4)))
                     
                     if stable_machine_position is None:
                         stable_machine_position = current_machine_pos
-                    elif all(abs(stable_machine_position[i] - current_machine_pos[i]) < 0.25 for i in range(4)):
+                    elif len(stable_machine_position) == len(current_machine_pos) and all(abs(stable_machine_position[i] - current_machine_pos[i]) < 0.25 for i in range(len(current_machine_pos))):
                         # Position is stable - same for 2 consecutive readings (0.25mm tolerance)
                         break
                     else:
@@ -664,6 +679,8 @@ class GrblMotorController:
         # Store the stable homed MACHINE position as work offset
         if stable_machine_position:
             with self.status_lock:
+                while len(stable_machine_position) < 4:
+                    stable_machine_position.append(self.position[len(stable_machine_position)])
                 self.work_offset = stable_machine_position.copy()
         else:
             # Fallback - use current position but this shouldn't happen
