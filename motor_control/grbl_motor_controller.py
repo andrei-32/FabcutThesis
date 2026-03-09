@@ -701,12 +701,42 @@ class GrblMotorController:
         self.send("$21=1")
         time.sleep(0.5)
         
-        # Send homing command
-        logger.info("Sending $H command...")
-        self.send("$H")
+        # Home axes sequentially for better control and diagnostics
+        # X axis first
+        logger.info("Homing X axis...")
+        self.send("$HX")
+        time.sleep(3)
+        self.send_immediate("?")
+        time.sleep(0.5)
+        logger.info(f"X homing complete. State={self.machine_state}")
         
-        # Wait for homing to complete - this is critical timing
-        time.sleep(10)  # Extended wait for all axes homing and pushoff
+        # Y axis second
+        logger.info("Homing Y axis...")
+        self.send("$HY")
+        time.sleep(3)
+        self.send_immediate("?")
+        time.sleep(0.5)
+        logger.info(f"Y homing complete. State={self.machine_state}")
+        
+        # Z axis third
+        logger.info("Homing Z axis...")
+        self.send("$HZ")
+        time.sleep(3)
+        self.send_immediate("?")
+        time.sleep(0.5)
+        logger.info(f"Z homing complete. State={self.machine_state}")
+        
+        # A axis last (if equipped)
+        logger.info("Homing A axis...")
+        self.send("$HA")
+        time.sleep(3)
+        self.send_immediate("?")
+        time.sleep(0.5)
+        logger.info(f"A homing complete. State={self.machine_state}")
+        
+        # Final status check
+        logger.info("All axes homed sequentially")
+        time.sleep(1)
         
         # Wait for machine to stabilize and get final MACHINE position
         logger.info("Waiting for machine to stabilize after homing...")
