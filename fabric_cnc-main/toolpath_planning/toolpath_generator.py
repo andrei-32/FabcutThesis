@@ -400,7 +400,7 @@ class ToolpathGenerator:
         # Convert to inches: 1 inch = 360 degrees
         a_position_inches = adjusted_angle / 360.0
             # Apply calibrated scaling factor to match motor behavior
-            a_position_inches = a_position_inches / self.a_scaling_factor
+        a_position_inches = a_position_inches / self.a_scaling_factor
         
         
         # Round to 4 decimal places to reduce precision issues

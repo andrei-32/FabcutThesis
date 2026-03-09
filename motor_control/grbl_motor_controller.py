@@ -332,7 +332,7 @@ class GrblMotorController:
                 "$19": "0",       # Laser mode
                 "$20": "0",       # Soft limits
                 "$21": "0",       # Hard limits disable (prevent A-axis limit issues)
-                "$22": "1",       # Homing cycle enable (DISABLED for testing - bypass homing requirement)
+                "$22": "1",       # Homing cycle enable
                 "$23": "3",       # Homing direction mask (X=1, Y=1, Z=0, A=0 - X&Y home positive, Z&A home negative)
                 "$24": "500.0",   # Homing seek rate (swapped - this implementation uses for first approach)
                 "$25": "1500.0",  # Homing feed rate (swapped - this implementation uses for second approach)
@@ -361,7 +361,7 @@ class GrblMotorController:
                 "$65": "0",       # Probe allow feed override
                 
                 # Steps per unit (inches)
-                "$100": "20.32000",   # X steps/inch
+                "$100": "20.32000",   # X steps/inch    
                 "$101": "20.32000",   # Y steps/inch  
                 "$102": "200.00000",  # Z steps/inch
                 "$103": "254.00000",  # A steps/inch
@@ -773,6 +773,10 @@ class GrblMotorController:
                 logger.info("Clearing alarm state before homing...")
                 self.send("$X")
                 time.sleep(1)
+
+            # Ensure homing is enabled even if firmware settings changed externally.
+            self.send("$22=1")
+            time.sleep(0.1)
             
             # Perform homing
             self.home_all()
