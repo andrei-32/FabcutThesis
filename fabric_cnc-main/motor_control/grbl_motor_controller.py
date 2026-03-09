@@ -360,8 +360,8 @@ class GrblMotorController:
                 # Steps per unit (inches)
                 "$100": "20.32000",   # X steps/inch
                 "$101": "20.32000",   # Y steps/inch  
-                "$102": "200.00000",  # Z steps/inch
-                "$103": "254.00000",  # A steps/inch
+                "$102": "20.32000",  # Z steps/inch
+                "$103": "20.32000",  # A steps/inch
                 
                 # Maximum rates (inches/min) - Conservative speeds for safety
                 "$110": "2000.000",   # X max rate (reduced for controlled cutting)
