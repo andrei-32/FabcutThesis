@@ -699,6 +699,32 @@ class GrblMotorController:
         except queue.Empty:
             pass
 
+    def _wait_for_homing_motion_complete(self, timeout=30.0):
+        """Wait until homing motion has started and returned to Idle."""
+        start_time = time.time()
+        saw_active_homing_state = False
+
+        while time.time() - start_time < timeout:
+            self.send_immediate("?")
+            time.sleep(0.15)
+
+            with self.status_lock:
+                state = self.machine_state
+                pins = getattr(self, 'last_limit_pins', "")
+
+            if state in ("Alarm", "Unknown"):
+                return False, f"state={state}, pins={pins}"
+
+            # Any non-idle/non-fault state indicates homing/motion is active.
+            if state not in ("Idle", "Alarm", "Unknown"):
+                saw_active_homing_state = True
+
+            # Only accept completion after we have observed active motion/homing.
+            if saw_active_homing_state and state == "Idle":
+                return True, f"state={state}, pins={pins}"
+
+        return False, f"timeout waiting homing completion, state={state}, pins={pins}"
+
     def jog(self, axis, delta, feedrate=100):
         if axis not in "XYZA":
             raise ValueError("Invalid axis")
@@ -754,12 +780,15 @@ class GrblMotorController:
 
                 self.send("$H")
                 ok, response = self._send_and_wait_response(timeout=25.0)
-                self.send_immediate("?")
-                time.sleep(0.5)
                 if ok:
-                    axis_homed = True
-                    logger.info(f"{axis_name} homing complete. State={self.machine_state}")
-                    break
+                    done_ok, done_info = self._wait_for_homing_motion_complete(timeout=30.0)
+                    if done_ok:
+                        axis_homed = True
+                        logger.info(f"{axis_name} homing complete. {done_info}")
+                        break
+                    last_error = done_info
+                    logger.warning(f"{axis_name} attempt {attempt} did not complete: {done_info}")
+                    continue
 
                 last_error = response
                 logger.warning(f"{axis_name} attempt {attempt} failed: {response}")
