@@ -326,6 +326,7 @@ class GrblMotorController:
                 "$11": "0.020",   # Junction deviation (increased for smoother high-speed moves)
                 "$12": "0.005",   # Arc tolerance (relaxed for faster arc processing)
                 "$13": "0",       # Report inches
+                "$14": "70",      # Invert control inputs: feed hold(2) + cycle start(4) + estop(64) = 70
                 "$15": "0",       # Work area alarm
                 "$16": "0",       # Work area alarm
                 "$18": "0",       # Tool change mode
@@ -695,6 +696,11 @@ class GrblMotorController:
         self.send("$22=1")
         time.sleep(0.5)
         
+        # Temporarily enable hard limits so GRBL can read limit switches during homing
+        logger.info("Temporarily enabling hard limits ($21=1) for homing...")
+        self.send("$21=1")
+        time.sleep(0.5)
+        
         # Send homing command
         logger.info("Sending $H command...")
         self.send("$H")
@@ -741,6 +747,15 @@ class GrblMotorController:
                 self.work_offset = self.position.copy()
         
         logger.info(f"Home all completed - work offset set to {self.work_offset}")
+        
+        # Disable hard limits again (prevent A-axis limit issues during normal operation)
+        logger.info("Disabling hard limits ($21=0) after homing...")
+        self.send("$21=0")
+        time.sleep(0.5)
+        
+        # Clear any alarm from disabling limits
+        self.send("$X")
+        time.sleep(0.5)
         
         # Set GRBL work coordinate system to origin at current position
         # This tells GRBL that the current (homed) position should be (0,0,0,0) in work coordinates
