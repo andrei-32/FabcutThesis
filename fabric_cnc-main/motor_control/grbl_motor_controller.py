@@ -166,6 +166,8 @@ class GrblMotorController:
         self.status_lock = threading.Lock()
         self.alarm_detected = False
         self.last_error_time = 0
+        self.last_serial_warning_time = 0  # Rate-limit serial warnings
+        self.serial_error_count = 0  # Track consecutive serial errors
         self.response_callback = None  # Callback for manual command responses
         self.is_homed = False  # Track if machine is homed
         self.machine_state = "Unknown"  # Track GRBL state (Idle, Run, Hold, Alarm, etc.)
@@ -469,7 +471,30 @@ class GrblMotorController:
         while self.running:
             try:
                 if self.serial and self.serial.is_open and self.serial.in_waiting:
-                    buffer += self.serial.read(self.serial.in_waiting)
+                    # Read with retry logic for transient USB issues
+                    try:
+                        data = self.serial.read(self.serial.in_waiting)
+                        if data:
+                            buffer += data
+                            self.serial_error_count = 0  # Reset error counter on success
+                        else:
+                            # Device reported readiness but returned no data - transient error
+                            self.serial_error_count += 1
+                            if self.serial_error_count <= 5:  # Only retry a few times
+                                time.sleep(0.01)  # Brief pause before retry
+                                continue
+                    except (serial.SerialException, OSError) as read_error:
+                        # Handle transient serial read errors gracefully
+                        self.serial_error_count += 1
+                        current_time = time.time()
+                        # Rate-limit warnings to once every 5 seconds
+                        if current_time - self.last_serial_warning_time > 5.0:
+                            logger.warning(f"Serial read issue (retry {self.serial_error_count}): {read_error}")
+                            self.last_serial_warning_time = current_time
+                        time.sleep(0.05)  # Back off briefly
+                        if self.serial_error_count > 10:  # Reset counter after many errors
+                            self.serial_error_count = 0
+                        continue
                     # Normalize CR/LF variants so status frames are parsed on all firmware builds.
                     buffer = buffer.replace(b'\r', b'\n')
                     lines = buffer.split(b'\n')
@@ -518,7 +543,11 @@ class GrblMotorController:
                                     self.response_callback("ok")
             except Exception as e:
                 if self.running:
-                    logger.warning(f"Serial read error in background thread: {e}")
+                    current_time = time.time()
+                    # Rate-limit generic error warnings
+                    if current_time - self.last_serial_warning_time > 5.0:
+                        logger.warning(f"Serial read error in background thread: {e}")
+                        self.last_serial_warning_time = current_time
                 time.sleep(0.1)
                 continue
             time.sleep(0.01)
@@ -1221,7 +1250,21 @@ class GrblMotorController:
         while pending_lines and (time.time() - timeout_start) < timeout_duration:
             try:
                 if self.serial and self.serial.in_waiting > 0:
-                    response = self.serial.readline().decode('utf-8').strip()
+                    # Read with error handling for transient issues
+                    try:
+                        response = self.serial.readline().decode('utf-8').strip()
+                    except (serial.SerialException, OSError) as read_error:
+                        # Transient read error - wait and continue
+                        current_time = time.time()
+                        if current_time - self.last_serial_warning_time > 5.0:
+                            logger.warning(f"Serial read issue in acknowledgment wait: {read_error}")
+                            self.last_serial_warning_time = current_time
+                        time.sleep(0.05)
+                        continue
+                    
+                    if not response:  # Empty response
+                        time.sleep(0.01)
+                        continue
                     
                     if response == 'ok':
                         if pending_lines:
@@ -1240,7 +1283,11 @@ class GrblMotorController:
                 time.sleep(0.001)  # 1ms polling for acknowledgments
                 
             except (serial.SerialException, OSError) as e:
-                logger.warning(f"Serial error waiting for acknowledgments: {e}")
+                current_time = time.time()
+                # Rate-limit these warnings to reduce terminal spam
+                if current_time - self.last_serial_warning_time > 5.0:
+                    logger.warning(f"Serial error waiting for acknowledgments: {e}")
+                    self.last_serial_warning_time = current_time
                 time.sleep(0.1)
                 continue
         
