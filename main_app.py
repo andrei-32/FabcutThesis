@@ -124,9 +124,9 @@ class SimulatedMotorController:
 
     def _clamp(self, axis, value):
         if axis == 'X':
-            return max(-config.APP_CONFIG['X_MAX_INCH'], min(value, config.APP_CONFIG['X_MAX_INCH']))
+            return max(0.0, min(value, config.APP_CONFIG['X_MAX_INCH']))
         elif axis == 'Y':
-            return max(-config.APP_CONFIG['Y_MAX_INCH'], min(value, config.APP_CONFIG['Y_MAX_INCH']))
+            return max(0.0, min(value, config.APP_CONFIG['Y_MAX_INCH']))
         elif axis == 'Z':
             return max(-3.0, min(value, 0.0))  # Z: -3.0 to 0.0 inches (main app handles runtime limit)
         elif axis == 'A':
@@ -226,15 +226,14 @@ class RealMotorController:
 
     def jog(self, axis, delta):
         try:
-
-            # For jogging, don't clamp - allow manual movement anywhere within machine limits
             # Get current position from GRBL
             current_pos = self.get_position()
             current_val = current_pos.get(axis, 0.0)
 
-            # Calculate target (don't clamp for jogging)
+            # Clamp jog target to machine limits
             target_val = current_val + delta
-            actual_delta = delta  # Use the requested delta directly
+            clamped_val = self._clamp(axis, target_val)
+            actual_delta = clamped_val - current_val
 
             if abs(actual_delta) > 1e-6:
                 # Use specified jog feedrates for each axis
@@ -2575,43 +2574,41 @@ class FabricCNCApp:
         if axis == 'A':
             delta = delta / 36.0
         
-        logger.info(f"[JOG DEBUG] Jogging axis {axis} by {delta:.3f}, current_pos={current_pos}")
-            
         # Check if position data has the requested axis
         if pos_axis not in current_pos:
             logger.error(f"Axis {pos_axis} not available in position data: {current_pos}")
             return
             
         new_pos = current_pos[pos_axis] + delta
-        
-        # TEMPORARY: Disable ALL bounds checking for testing without homing
+
         # Bounds checking
-        # if axis == 'X':
-        #     if new_pos < 0:
-        #         logger.warning(f"X jog blocked: would move to {new_pos:.3f} (min: 0)")
-        #         return
-        #     elif new_pos > config.APP_CONFIG['X_MAX_INCH']:
-        #         logger.warning(f"X jog blocked: would move to {new_pos:.3f} (max: {config.APP_CONFIG['X_MAX_INCH']})")
-        #         return
-        # elif axis == 'Y':
-        #     if new_pos < 0:
-        #         logger.warning(f"Y jog blocked: would move to {new_pos:.3f} (min: 0)")
-        #         return
-        #     elif new_pos > config.APP_CONFIG['Y_MAX_INCH']:
-        #         logger.warning(f"Y jog blocked: would move to {new_pos:.3f} (max: {config.APP_CONFIG['Y_MAX_INCH']})")
-        #         return
-        # elif axis == 'Z':
-        #     if new_pos > 0:
-        #         logger.warning(f"Z jog blocked: would move to {new_pos:.3f} (max: 0)")
-        #         return
-        # elif axis == 'A':
-        #     # Allow continuous rotation - remove bounds checking for A-axis
-        #     pass
+        if axis == 'X':
+            if new_pos < 0:
+                logger.warning(f"X jog blocked: would move to {new_pos:.3f} (min: 0)")
+                return
+            elif new_pos > config.APP_CONFIG['X_MAX_INCH']:
+                logger.warning(f"X jog blocked: would move to {new_pos:.3f} (max: {config.APP_CONFIG['X_MAX_INCH']})")
+                return
+        elif axis == 'Y':
+            if new_pos < 0:
+                logger.warning(f"Y jog blocked: would move to {new_pos:.3f} (min: 0)")
+                return
+            elif new_pos > config.APP_CONFIG['Y_MAX_INCH']:
+                logger.warning(f"Y jog blocked: would move to {new_pos:.3f} (max: {config.APP_CONFIG['Y_MAX_INCH']})")
+                return
+        elif axis == 'Z':
+            if new_pos > 0:
+                logger.warning(f"Z jog blocked: would move to {new_pos:.3f} (max: 0)")
+                return
+            elif new_pos < self.z_lower_limit:
+                logger.warning(f"Z jog blocked: would move to {new_pos:.3f} (min: {self.z_lower_limit:.2f})")
+                return
+        elif axis == 'A':
+            # Allow continuous rotation - no bounds for A-axis
+            pass
         
         # No axis mapping needed - GUI and GRBL both use 'A'
         grbl_axis = axis
-        
-        logger.info(f"[JOG DEBUG] Sending jog command: axis={grbl_axis}, delta={delta:.3f}")
         
         # Use slower feedrate for A-axis for more controlled rotation
         feedrate = 30 if axis == 'A' else 100
