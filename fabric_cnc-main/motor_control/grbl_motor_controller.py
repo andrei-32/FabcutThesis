@@ -161,7 +161,6 @@ class GrblMotorController:
         # Try to open the serial connection with cleanup
         self._open_serial_with_cleanup()
         self.command_queue = queue.Queue()
-        self.ack_queue = queue.Queue()  # Queue for acknowledgments during G-code streaming
         self.running = True
         self.position = [0.0, 0.0, 0.0, 0.0]  # X, Y, Z, A
         self.status_lock = threading.Lock()
@@ -319,13 +318,14 @@ class GrblMotorController:
                 "$2": "0",        # Step pulse invert
                 "$3": "11",       # Step direction invert (X=1, Y=2, A=8, total=11, Z not inverted)
                 "$4": "15",       # Step enable invert
-                "$5": "15",       # Limit pins invert
+                "$5": "0",        # Limit pins invert (0=no invert, try if switches are normally-open)
                 "$6": "0",        # Probe pin invert
                 "$9": "1",        # PWM spindle mode
                 "$10": "2",       # Status report options: WPos only (1=MPos, 2=WPos, 3=both)
                 "$11": "0.020",   # Junction deviation (increased for smoother high-speed moves)
                 "$12": "0.005",   # Arc tolerance (relaxed for faster arc processing)
                 "$13": "0",       # Report inches
+                "$14": "70",      # Invert control inputs: feed hold(2) + cycle start(4) + estop(64) = 70
                 "$15": "0",       # Work area alarm
                 "$16": "0",       # Work area alarm
                 "$18": "0",       # Tool change mode
@@ -349,9 +349,9 @@ class GrblMotorController:
                 "$36": "100.0",   # Spindle PWM max value
                 "$37": "0",       # Stepper deenergize mask
                 "$39": "1",       # Enable legacy RT commands
-                "$40": "0",       # Limit/control pins pull-up disable
+                "$40": "0",       # Limit/control pins pull-up ENABLED (0=enabled, 1=disabled)
                 "$43": "1",       # Homing passes
-                "$44": "4",       # Homing cycle mask
+                "$44": "7",       # Homing cycle mask (X=1, Y=2, Z=4: 1+2+4=7 home X,Y,Z together)
                 "$45": "11",      # Homing cycle pulloff mask
                 "$46": "0",       # Homing cycle allow manual
                 "$47": "0",       # Homing cycle mpos set
@@ -364,7 +364,7 @@ class GrblMotorController:
                 "$100": "20.32000",   # X steps/inch
                 "$101": "20.32000",   # Y steps/inch  
                 "$102": "200.00000",  # Z steps/inch
-                "$103": "254.00000",  # A steps/inch
+                "$103": "20.000",  # A steps/inch
                 
                 # Maximum rates (inches/min) - Conservative speeds for safety
                 "$110": "2000.000",   # X max rate (reduced for controlled cutting)
@@ -506,10 +506,6 @@ class GrblMotorController:
                             self._last_status_line = decoded  # Store for direct parsing during homing
                             self._parse_status(decoded)
                         else:
-                            # Put acknowledgments in queue for G-code streaming
-                            if decoded == "ok" or decoded.startswith("error:") or decoded.startswith("ALARM:"):
-                                self.ack_queue.put(decoded)
-                            
                             if self.debug_mode:
                                 print(f"[GRBL RESP] {decoded}")
                             elif not decoded.strip() == "ok":  # Only log non-"ok" responses in non-debug mode
@@ -589,9 +585,13 @@ class GrblMotorController:
         if state_match:
             with self.status_lock:
                 self.machine_state = state_match.group(1)
-                # Machine is considered homed if not in Alarm state and has valid coordinates
-                # GRBL doesn't explicitly report "homed" status, but Alarm state usually means not homed
-                self.is_homed = self.machine_state not in ["Alarm", "Unknown"]
+                # Do not infer homed from Idle alone; only clear on explicit fault states.
+                if self.machine_state in ["Alarm", "Unknown"]:
+                    self.is_homed = False
+
+        pin_match = re.search(r"\|Pn:([A-Za-z]+)", line)
+        with self.status_lock:
+            self.last_limit_pins = pin_match.group(1) if pin_match else ""
         
         # Try to parse work coordinates first (WPos), then fall back to machine coordinates (MPos).
         # Some GRBL builds report XYZ only, others report XYZA.
@@ -670,6 +670,71 @@ class GrblMotorController:
     def send_immediate(self, gcode_line):
         self.serial.write((gcode_line + "\n").encode('utf-8'))
 
+    def _send_and_wait_response(self, timeout=10.0):
+        """Wait for a command response from GRBL via the acknowledgment queue."""
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            try:
+                response = self.ack_queue.get(timeout=0.1)
+            except queue.Empty:
+                continue
+
+            if response == "ok":
+                return True, response
+            if response.startswith("error:") or response.startswith("ALARM:"):
+                return False, response
+
+        return False, "timeout"
+
+    def _drain_ack_queue(self):
+        """Drain stale responses so the next command gets a fresh acknowledgment."""
+        try:
+            while True:
+                self.ack_queue.get_nowait()
+        except queue.Empty:
+            pass
+
+    def _wait_for_homing_motion_complete(self, timeout=30.0):
+        """Wait until homing motion has started and returned to Idle."""
+        start_time = time.time()
+        saw_active_homing_state = False
+        state = "Unknown"
+        pins = ""
+
+        while time.time() - start_time < timeout:
+            self.send_immediate("?")
+            time.sleep(0.15)
+
+            with self.status_lock:
+                state = self.machine_state
+                pins = getattr(self, 'last_limit_pins', "")
+
+            if state in ("Alarm", "Unknown"):
+                # Some firmware enters Alarm right after a successful limit hit.
+                # Try one unlock/recheck path before declaring failure.
+                self.send("$X")
+                time.sleep(0.25)
+                self.send_immediate("?")
+                time.sleep(0.15)
+                with self.status_lock:
+                    recovered_state = self.machine_state
+                    recovered_pins = getattr(self, 'last_limit_pins', "")
+
+                if saw_active_homing_state and recovered_state == "Idle":
+                    return True, f"state={recovered_state}, pins={recovered_pins} (recovered from Alarm)"
+
+                return False, f"state={state}, pins={pins}"
+
+            # Any non-idle/non-fault state indicates homing/motion is active.
+            if state not in ("Idle", "Alarm", "Unknown"):
+                saw_active_homing_state = True
+
+            # Only accept completion after we have observed active motion/homing.
+            if saw_active_homing_state and state == "Idle":
+                return True, f"state={state}, pins={pins}"
+
+        return False, f"timeout waiting homing completion, state={state}, pins={pins}"
+
     def jog(self, axis, delta, feedrate=100):
         if axis not in "XYZA":
             raise ValueError("Invalid axis")
@@ -683,10 +748,71 @@ class GrblMotorController:
     def home_all(self):
         """Home all axes using $H command."""
         logger.info("Starting home all axes sequence...")
-        self.send("$H")
+        with self.status_lock:
+            self.is_homed = False
         
-        # Wait for homing to complete - this is critical timing
-        time.sleep(10)  # Extended wait for all axes homing and pushoff
+        # Clear any alarms first
+        if self.machine_state == "Alarm":
+            logger.info("Clearing alarm state before homing...")
+            self.send("$X")
+            time.sleep(1)
+        
+        # Ensure homing is enabled
+        logger.info("Enabling homing cycle ($22=1)...")
+        self.send("$22=1")
+        time.sleep(0.5)
+        
+        # Keep hard limits disabled during homing to avoid false Alarm trips at switch hit/pull-off.
+        logger.info("Ensuring hard limits are disabled during homing ($21=0)...")
+        self.send("$21=0")
+        time.sleep(0.5)
+        
+        # Home axes sequentially using mask + $H for better compatibility.
+        axis_masks = [("X", "1"), ("Y", "2"), ("Z", "4"), ("A", "8")]
+        for axis_name, axis_mask in axis_masks:
+            logger.info(f"Homing {axis_name} axis...")
+
+            axis_homed = False
+            last_error = "unknown"
+            for attempt in range(1, 3):
+                self._drain_ack_queue()
+
+                # Clear alarm/lockout before each homing attempt.
+                self.send("$X")
+                time.sleep(0.2)
+
+                self.send(f"$44={axis_mask}")
+                ok, response = self._send_and_wait_response(timeout=3.0)
+                if not ok:
+                    last_error = f"set mask failed: {response}"
+                    logger.warning(f"{axis_name} attempt {attempt}: {last_error}")
+                    continue
+
+                self.send("$H")
+                ok, response = self._send_and_wait_response(timeout=25.0)
+                if ok:
+                    done_ok, done_info = self._wait_for_homing_motion_complete(timeout=30.0)
+                    if done_ok:
+                        axis_homed = True
+                        logger.info(f"{axis_name} homing complete. {done_info}")
+                        break
+                    last_error = done_info
+                    logger.warning(f"{axis_name} attempt {attempt} did not complete: {done_info}")
+                    continue
+
+                last_error = response
+                logger.warning(f"{axis_name} attempt {attempt} failed: {response}")
+                if response in ("error:9", "error:79"):
+                    self.send("$X")
+                    time.sleep(0.3)
+
+            if not axis_homed:
+                raise RuntimeError(f"{axis_name} homing failed after retries: {last_error}")
+
+        # Restore profile default mask after sequential homing.
+        self.send("$44=7")
+        self._send_and_wait_response(timeout=3.0)
+        logger.info("All axes homed sequentially")
         
         # Wait for machine to stabilize and get final MACHINE position
         logger.info("Waiting for machine to stabilize after homing...")
@@ -727,6 +853,9 @@ class GrblMotorController:
                 self.work_offset = self.position.copy()
         
         logger.info(f"Home all completed - work offset set to {self.work_offset}")
+        
+        # Keep hard limits disabled after homing (current machine profile).
+        logger.info("Hard limits remain disabled after homing ($21=0).")
         
         # Set GRBL work coordinate system to origin at current position
         # This tells GRBL that the current (homed) position should be (0,0,0,0) in work coordinates
@@ -773,6 +902,10 @@ class GrblMotorController:
                 logger.info("Clearing alarm state before homing...")
                 self.send("$X")
                 time.sleep(1)
+
+            # Ensure homing is enabled even if firmware settings changed externally.
+            self.send("$22=1")
+            time.sleep(0.1)
             
             # Perform homing
             self.home_all()
@@ -1248,39 +1381,50 @@ class GrblMotorController:
             self._wait_for_acknowledgments(pending_lines)
     
     def _wait_for_acknowledgments(self, pending_lines):
-        """Wait for and process acknowledgments from GRBL via the acknowledgment queue."""
+        """Wait for and process acknowledgments from GRBL."""
         timeout_start = time.time()
         timeout_duration = 30.0  # 30 second timeout
         
         while pending_lines and (time.time() - timeout_start) < timeout_duration:
             try:
-                # Get acknowledgment from queue (populated by reader thread)
-                try:
-                    response = self.ack_queue.get(timeout=0.1)
-                except queue.Empty:
-                    continue
+                if self.serial and self.serial.in_waiting > 0:
+                    # Read with error handling for transient issues
+                    try:
+                        response = self.serial.readline().decode('utf-8').strip()
+                    except (serial.SerialException, OSError) as read_error:
+                        # Transient read error - wait and continue
+                        current_time = time.time()
+                        if current_time - self.last_serial_warning_time > 5.0:
+                            logger.warning(f"Serial read issue in acknowledgment wait: {read_error}")
+                            self.last_serial_warning_time = current_time
+                        time.sleep(0.05)
+                        continue
+                    
+                    if not response:  # Empty response
+                        time.sleep(0.01)
+                        continue
+                    
+                    if response == 'ok':
+                        if pending_lines:
+                            line_num, gcode_line = pending_lines.pop(0)
+                        continue
+                    elif response.startswith('error:'):
+                        if pending_lines:
+                            line_num, gcode_line = pending_lines.pop(0)
+                            logger.error(f"GRBL error on line {line_num}: {response}")
+                        continue
+                    elif response.startswith('ALARM:'):
+                        logger.error(f"GRBL alarm: {response}")
+                        raise Exception(f"GRBL alarm: {response}")
+                    # Ignore status and other responses
+                    
+                time.sleep(0.001)  # 1ms polling for acknowledgments
                 
-                if response == 'ok':
-                    if pending_lines:
-                        line_num, gcode_line = pending_lines.pop(0)
-                    continue
-                elif response.startswith('error:'):
-                    if pending_lines:
-                        line_num, gcode_line = pending_lines.pop(0)
-                        logger.error(f"GRBL error on line {line_num}: {response}")
-                    continue
-                elif response.startswith('ALARM:'):
-                    logger.error(f"GRBL alarm: {response}")
-                    raise Exception(f"GRBL alarm: {response}")
-                # Ignore other responses
-                
-            except Exception as e:
-                if "GRBL alarm" in str(e):
-                    raise  # Re-raise alarm exceptions
+            except (serial.SerialException, OSError) as e:
                 current_time = time.time()
                 # Rate-limit these warnings to reduce terminal spam
                 if current_time - self.last_serial_warning_time > 5.0:
-                    logger.warning(f"Error processing acknowledgment: {e}")
+                    logger.warning(f"Serial error waiting for acknowledgments: {e}")
                     self.last_serial_warning_time = current_time
                 time.sleep(0.1)
                 continue
