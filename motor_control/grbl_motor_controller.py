@@ -590,9 +590,13 @@ class GrblMotorController:
         if state_match:
             with self.status_lock:
                 self.machine_state = state_match.group(1)
-                # Machine is considered homed if not in Alarm state and has valid coordinates
-                # GRBL doesn't explicitly report "homed" status, but Alarm state usually means not homed
-                self.is_homed = self.machine_state not in ["Alarm", "Unknown"]
+                # Do not infer homed from Idle alone; only clear on explicit fault states.
+                if self.machine_state in ["Alarm", "Unknown"]:
+                    self.is_homed = False
+
+        pin_match = re.search(r"\|Pn:([A-Za-z]+)", line)
+        with self.status_lock:
+            self.last_limit_pins = pin_match.group(1) if pin_match else ""
         
         # Try to parse work coordinates first (WPos), then fall back to machine coordinates (MPos).
         # Some GRBL builds report XYZ only, others report XYZA.
@@ -671,6 +675,22 @@ class GrblMotorController:
     def send_immediate(self, gcode_line):
         self.serial.write((gcode_line + "\n").encode('utf-8'))
 
+    def _send_and_wait_response(self, timeout=10.0):
+        """Wait for a command response from GRBL via the acknowledgment queue."""
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            try:
+                response = self.ack_queue.get(timeout=0.1)
+            except queue.Empty:
+                continue
+
+            if response == "ok":
+                return True, response
+            if response.startswith("error:") or response.startswith("ALARM:"):
+                return False, response
+
+        return False, "timeout"
+
     def jog(self, axis, delta, feedrate=100):
         if axis not in "XYZA":
             raise ValueError("Invalid axis")
@@ -684,6 +704,8 @@ class GrblMotorController:
     def home_all(self):
         """Home all axes using $H command."""
         logger.info("Starting home all axes sequence...")
+        with self.status_lock:
+            self.is_homed = False
         
         # Clear any alarms first
         if self.machine_state == "Alarm":
@@ -701,42 +723,29 @@ class GrblMotorController:
         self.send("$21=1")
         time.sleep(0.5)
         
-        # Home axes sequentially for better control and diagnostics
-        # X axis first
-        logger.info("Homing X axis...")
-        self.send("$HX")
-        time.sleep(3)
-        self.send_immediate("?")
-        time.sleep(0.5)
-        logger.info(f"X homing complete. State={self.machine_state}")
-        
-        # Y axis second
-        logger.info("Homing Y axis...")
-        self.send("$HY")
-        time.sleep(3)
-        self.send_immediate("?")
-        time.sleep(0.5)
-        logger.info(f"Y homing complete. State={self.machine_state}")
-        
-        # Z axis third
-        logger.info("Homing Z axis...")
-        self.send("$HZ")
-        time.sleep(3)
-        self.send_immediate("?")
-        time.sleep(0.5)
-        logger.info(f"Z homing complete. State={self.machine_state}")
-        
-        # A axis last (if equipped)
-        logger.info("Homing A axis...")
-        self.send("$HA")
-        time.sleep(3)
-        self.send_immediate("?")
-        time.sleep(0.5)
-        logger.info(f"A homing complete. State={self.machine_state}")
-        
-        # Final status check
+        # Home axes sequentially using mask + $H for better compatibility.
+        axis_masks = [("X", "1"), ("Y", "2"), ("Z", "4"), ("A", "8")]
+        for axis_name, axis_mask in axis_masks:
+            logger.info(f"Homing {axis_name} axis...")
+
+            self.send(f"$44={axis_mask}")
+            ok, response = self._send_and_wait_response(timeout=3.0)
+            if not ok:
+                raise RuntimeError(f"Failed to set homing mask for {axis_name}: {response}")
+
+            self.send("$H")
+            ok, response = self._send_and_wait_response(timeout=20.0)
+            self.send_immediate("?")
+            time.sleep(0.5)
+            if not ok:
+                raise RuntimeError(f"{axis_name} homing failed: {response}")
+
+            logger.info(f"{axis_name} homing complete. State={self.machine_state}")
+
+        # Restore profile default mask after sequential homing.
+        self.send("$44=7")
+        self._send_and_wait_response(timeout=3.0)
         logger.info("All axes homed sequentially")
-        time.sleep(1)
         
         # Wait for machine to stabilize and get final MACHINE position
         logger.info("Waiting for machine to stabilize after homing...")
