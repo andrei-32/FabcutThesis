@@ -2499,7 +2499,7 @@ class FabricCNCApp:
         # Scale down A-axis jog for finer control.
         # Fine-tuned from 36-click test (~330 deg total, target 360 deg).
         if axis == 'A':
-            delta = delta / 561.0
+            delta = delta / 700
             
         # Check if position data has the requested axis
         if pos_axis not in current_pos:
