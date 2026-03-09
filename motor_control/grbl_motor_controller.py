@@ -161,6 +161,7 @@ class GrblMotorController:
         # Try to open the serial connection with cleanup
         self._open_serial_with_cleanup()
         self.command_queue = queue.Queue()
+        self.ack_queue = queue.Queue()  # Queue for acknowledgments during G-code streaming
         self.running = True
         self.position = [0.0, 0.0, 0.0, 0.0]  # X, Y, Z, A
         self.status_lock = threading.Lock()
@@ -505,6 +506,10 @@ class GrblMotorController:
                             self._last_status_line = decoded  # Store for direct parsing during homing
                             self._parse_status(decoded)
                         else:
+                            # Put acknowledgments in queue for G-code streaming
+                            if decoded == "ok" or decoded.startswith("error:") or decoded.startswith("ALARM:"):
+                                self.ack_queue.put(decoded)
+                            
                             if self.debug_mode:
                                 print(f"[GRBL RESP] {decoded}")
                             elif not decoded.strip() == "ok":  # Only log non-"ok" responses in non-debug mode
@@ -1243,50 +1248,39 @@ class GrblMotorController:
             self._wait_for_acknowledgments(pending_lines)
     
     def _wait_for_acknowledgments(self, pending_lines):
-        """Wait for and process acknowledgments from GRBL."""
+        """Wait for and process acknowledgments from GRBL via the acknowledgment queue."""
         timeout_start = time.time()
         timeout_duration = 30.0  # 30 second timeout
         
         while pending_lines and (time.time() - timeout_start) < timeout_duration:
             try:
-                if self.serial and self.serial.in_waiting > 0:
-                    # Read with error handling for transient issues
-                    try:
-                        response = self.serial.readline().decode('utf-8').strip()
-                    except (serial.SerialException, OSError) as read_error:
-                        # Transient read error - wait and continue
-                        current_time = time.time()
-                        if current_time - self.last_serial_warning_time > 5.0:
-                            logger.warning(f"Serial read issue in acknowledgment wait: {read_error}")
-                            self.last_serial_warning_time = current_time
-                        time.sleep(0.05)
-                        continue
-                    
-                    if not response:  # Empty response
-                        time.sleep(0.01)
-                        continue
-                    
-                    if response == 'ok':
-                        if pending_lines:
-                            line_num, gcode_line = pending_lines.pop(0)
-                        continue
-                    elif response.startswith('error:'):
-                        if pending_lines:
-                            line_num, gcode_line = pending_lines.pop(0)
-                            logger.error(f"GRBL error on line {line_num}: {response}")
-                        continue
-                    elif response.startswith('ALARM:'):
-                        logger.error(f"GRBL alarm: {response}")
-                        raise Exception(f"GRBL alarm: {response}")
-                    # Ignore status and other responses
-                    
-                time.sleep(0.001)  # 1ms polling for acknowledgments
+                # Get acknowledgment from queue (populated by reader thread)
+                try:
+                    response = self.ack_queue.get(timeout=0.1)
+                except queue.Empty:
+                    continue
                 
-            except (serial.SerialException, OSError) as e:
+                if response == 'ok':
+                    if pending_lines:
+                        line_num, gcode_line = pending_lines.pop(0)
+                    continue
+                elif response.startswith('error:'):
+                    if pending_lines:
+                        line_num, gcode_line = pending_lines.pop(0)
+                        logger.error(f"GRBL error on line {line_num}: {response}")
+                    continue
+                elif response.startswith('ALARM:'):
+                    logger.error(f"GRBL alarm: {response}")
+                    raise Exception(f"GRBL alarm: {response}")
+                # Ignore other responses
+                
+            except Exception as e:
+                if "GRBL alarm" in str(e):
+                    raise  # Re-raise alarm exceptions
                 current_time = time.time()
                 # Rate-limit these warnings to reduce terminal spam
                 if current_time - self.last_serial_warning_time > 5.0:
-                    logger.warning(f"Serial error waiting for acknowledgments: {e}")
+                    logger.warning(f"Error processing acknowledgment: {e}")
                     self.last_serial_warning_time = current_time
                 time.sleep(0.1)
                 continue
