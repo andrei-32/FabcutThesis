@@ -740,7 +740,7 @@ class GrblMotorController:
             raise ValueError("Invalid axis")
         
         # Use G91 for relative movement, let GRBL use current unit mode
-        command = f"$J=G91 {axis}{delta:.3f} F{feedrate}"
+        command = f"$J=G91 {axis}{delta:.5f} F{feedrate}"
         if self.debug_mode:
             print(f"[GRBL DEBUG] Sending jog command: {command}")
         self.send(command)
