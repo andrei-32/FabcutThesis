@@ -317,7 +317,7 @@ class GrblMotorController:
                 "$0": "5.0",      # Step pulse time
                 "$1": "25",       # Step idle delay
                 "$2": "0",        # Step pulse invert
-                "$3": "10",       # Step direction invert (Y=2, A=8, total=10, X&Z not inverted)
+                "$3": "8",        # Step direction invert (A=8 only; Y inverted OFF)
                 "$4": "15",       # Step enable invert
                 "$5": "0",        # Limit pins invert (0=no invert, try if switches are normally-open)
                 "$6": "0",        # Probe pin invert
