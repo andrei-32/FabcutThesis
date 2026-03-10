@@ -488,6 +488,9 @@ class FabricCNCApp:
         
         self.motor_ctrl = SimulatedMotorController() if SIMULATION_MODE else RealMotorController()
         self._jog_in_progress = {'X': False, 'Y': False, 'Z': False, 'A': False}
+        self._jog_guard_until = {'X': 0.0, 'Y': 0.0, 'Z': 0.0, 'A': 0.0}
+        self._pending_jog_target = {'X': None, 'Y': None, 'Z': None, 'A': None}
+        self._jog_guard_ms = 300
         self._arrow_key_repeat_delay = config.APP_CONFIG['ARROW_KEY_REPEAT_DELAY']
         
         # Performance optimization: Canvas redraw debouncing
@@ -2559,6 +2562,10 @@ class FabricCNCApp:
         """Jog with bounds checking to prevent moves outside machine limits."""
         if not MOTOR_IMPORTS_AVAILABLE or SIMULATION_MODE:
             return
+
+        now = time.monotonic()
+        if now < self._jog_guard_until.get(axis, 0.0):
+            return
         
         # Get current position
         current_pos = self.motor_ctrl.get_position()
@@ -2578,8 +2585,14 @@ class FabricCNCApp:
         if pos_axis not in current_pos:
             logger.error(f"Axis {pos_axis} not available in position data: {current_pos}")
             return
-            
-        new_pos = current_pos[pos_axis] + delta
+
+        # Use predicted target during rapid input so bounds checks include in-flight jogs.
+        reference_pos = current_pos[pos_axis]
+        pending_target = self._pending_jog_target.get(axis)
+        if pending_target is not None:
+            reference_pos = pending_target
+
+        new_pos = reference_pos + delta
 
         # Bounds checking
         if axis == 'X':
@@ -2619,7 +2632,16 @@ class FabricCNCApp:
             self.motor_ctrl.jog(grbl_axis, delta, feedrate)
         except TypeError:
             self.motor_ctrl.jog(grbl_axis, delta)
+
+        # Short guard window prevents click-spam from buffering jog commands.
+        self._pending_jog_target[axis] = new_pos
+        self._jog_guard_until[axis] = time.monotonic() + (self._jog_guard_ms / 1000.0)
+        self.root.after(self._jog_guard_ms, lambda a=axis: self._release_jog_guard(a))
         # Position update loop will handle canvas redraw automatically
+
+    def _release_jog_guard(self, axis):
+        self._jog_guard_until[axis] = 0.0
+        self._pending_jog_target[axis] = None
 
 
     def _home_all(self):
@@ -2639,6 +2661,10 @@ class FabricCNCApp:
         """Stop all movement and cancel any pending arrow key operations."""
         # Stop any ongoing motor movement
         self.motor_ctrl.stop_movement()
+
+        for axis in self._jog_guard_until:
+            self._jog_guard_until[axis] = 0.0
+            self._pending_jog_target[axis] = None
         
         # Cancel all pending arrow key operations
         for key in self._arrow_key_after_ids:
