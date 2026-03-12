@@ -779,12 +779,6 @@ class FabricCNCApp:
         
         # Bind canvas resize
         self.center_column.bind("<Configure>", self._on_canvas_resize)
-        self.canvas.bind("<ButtonPress-1>", self._pan_start)
-        self.canvas.bind("<B1-Motion>", self._pan_move)
-        self.canvas.bind("<ButtonRelease-1>", self._pan_end)
-        self.canvas.bind("<MouseWheel>", self._on_mouse_wheel_zoom)
-        self.canvas.bind("<Button-4>", self._on_mouse_wheel_zoom_linux)
-        self.canvas.bind("<Button-5>", self._on_mouse_wheel_zoom_linux)
         
         
         # Initialize canvas dimensions
@@ -792,11 +786,6 @@ class FabricCNCApp:
         self.canvas_height = 600  # Default, will be updated by resize
         self.canvas_scale = 1.0
         self.canvas_offset = (0, 0)
-
-        # Zoom and pan state
-        self.zoom_level = 1.0
-        self.pan_offset = (0.0, 0.0)  # Pan offset in pixels
-        self._pan_start_pos = None
         
         
         # Defer initial canvas draw to speed up startup
@@ -1212,16 +1201,7 @@ class FabricCNCApp:
         oy = (canvas_height - plot_height_in * scale) / 2
         y_base = (plot_height_in - y_in) * scale + oy
         x_base = x_in * scale + ox
-        if not apply_zoom or not hasattr(self, 'zoom_level'):
-            return x_base, y_base
-        center_x = canvas_width / 2
-        center_y = canvas_height / 2
-        x_zoomed = center_x + (x_base - center_x) * self.zoom_level
-        y_zoomed = center_y + (y_base - center_y) * self.zoom_level
-        pan_offset = getattr(self, 'pan_offset', (0.0, 0.0))
-        x_final = x_zoomed + pan_offset[0]
-        y_final = y_zoomed + pan_offset[1]
-        return x_final, y_final
+        return x_base, y_base
 
     def _draw_tool_head_inches(self, canvas, canvas_width, canvas_height, pos):
         # Draw a small circle at the current tool head position (in inches)
@@ -1240,87 +1220,6 @@ class FabricCNCApp:
         canvas.create_text(x_c, y_c - r - 15, text=f"(X={x_in:.2f}, Y={y_in:.2f})", fill=UI_COLORS['PRIMARY_VARIANT'], font=("Arial", 10, "bold"))
         
         # Tool head position updated
-
-    def _zoom_in(self):
-        """Zoom in the canvas view (keep centered)."""
-        self._zoom_at(1.2, keep_center=True)
-
-    def _zoom_out(self):
-        """Zoom out the canvas view (keep centered)."""
-        self._zoom_at(1 / 1.2, keep_center=True)
-
-    def _reset_zoom(self):
-        """Reset zoom and pan to default."""
-        self.zoom_level = 1.0
-        self.pan_offset = (0.0, 0.0)
-        self._schedule_canvas_redraw()
-
-    def _zoom_at(self, factor, screen_x=None, screen_y=None, keep_center=False):
-        """Zoom around a specific screen point or keep centered."""
-        new_zoom = self.zoom_level * factor
-        if new_zoom < 1.0:
-            new_zoom = 1.0
-        if new_zoom > 6.0:
-            new_zoom = 6.0
-
-        if abs(new_zoom - self.zoom_level) < 1e-6:
-            return
-
-        self.zoom_level = new_zoom
-
-        if keep_center or screen_x is None or screen_y is None:
-            self.pan_offset = (0.0, 0.0)
-            self._schedule_canvas_redraw()
-            return
-
-        center_x = self.canvas_width / 2
-        center_y = self.canvas_height / 2
-
-        base_x = (screen_x - self.pan_offset[0] - center_x) / (self.zoom_level / factor) + center_x
-        base_y = (screen_y - self.pan_offset[1] - center_y) / (self.zoom_level / factor) + center_y
-
-        self.pan_offset = (
-            screen_x - center_x - (base_x - center_x) * self.zoom_level,
-            screen_y - center_y - (base_y - center_y) * self.zoom_level
-        )
-
-        self._schedule_canvas_redraw()
-
-    def _on_mouse_wheel_zoom(self, event):
-        """Zoom using mouse wheel / touchpad gesture."""
-        if event.delta > 0:
-            factor = 1.1
-        else:
-            factor = 1 / 1.1
-        self._zoom_at(factor, keep_center=True)
-
-    def _on_mouse_wheel_zoom_linux(self, event):
-        """Linux mouse wheel zoom support."""
-        if event.num == 4:
-            factor = 1.1
-        else:
-            factor = 1 / 1.1
-        self._zoom_at(factor, keep_center=True)
-
-    def _pan_start(self, event):
-        """Start panning the canvas."""
-        self._pan_start_pos = (event.x, event.y)
-        self.canvas.config(cursor="fleur")
-
-    def _pan_move(self, event):
-        """Move the canvas while panning."""
-        if self._pan_start_pos:
-            dx = event.x - self._pan_start_pos[0]
-            dy = event.y - self._pan_start_pos[1]
-            self.pan_offset = (self.pan_offset[0] + dx, self.pan_offset[1] + dy)
-            self._pan_start_pos = (event.x, event.y)
-            self._schedule_canvas_redraw()
-
-    def _pan_end(self, event):
-        """End panning."""
-        self._pan_start_pos = None
-        self.canvas.config(cursor="")
-
 
     def _draw_dxf_entities_inches(self, canvas, canvas_width, canvas_height):
         # Draw DXF entities, converting mm to inches for plotting
