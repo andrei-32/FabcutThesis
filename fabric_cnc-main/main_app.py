@@ -581,8 +581,14 @@ class FabricCNCApp:
         self.app_bar.grid_columnconfigure(3, weight=0)  # Close button column
         self.app_bar.grid_rowconfigure(0, weight=1)
         
-        # Title on the left
-        self.title = ctk.CTkLabel(self.app_bar, text="   FABCUT: Automated Fabric Cutting Machine", text_color=UI_COLORS['ON_PRIMARY'], font=("Arial", 25, "bold"))
+        # Logo on the left
+        try:
+            from PIL import Image
+            _logo_pil = Image.open(os.path.join(os.path.dirname(__file__), "assets", "fabcut-logo-01.png"))
+            _logo_img = ctk.CTkImage(light_image=_logo_pil, dark_image=_logo_pil, size=(160, 44))
+            self.title = ctk.CTkLabel(self.app_bar, image=_logo_img, text="")
+        except Exception:
+            self.title = ctk.CTkLabel(self.app_bar, text="FABCUT", text_color=UI_COLORS['ON_PRIMARY'], font=("Arial", 25, "bold"))
         self.title.grid(row=0, column=0, padx=UI_PADDING['SMALL'], pady=UI_PADDING['SMALL'], sticky="w")
         
         # Status display in the middle-right
