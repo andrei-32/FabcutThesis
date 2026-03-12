@@ -777,25 +777,6 @@ class FabricCNCApp:
         self.canvas = ctk.CTkCanvas(self.center_column, bg=UI_COLORS['SURFACE'], highlightthickness=0)
         self.canvas.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
         
-        # Zoom controls - vertical stack at right side of working area
-        self.zoom_controls = ctk.CTkFrame(self.center_column, fg_color="transparent")
-        self.zoom_controls.place(relx=0.985, rely=0.5, anchor='e')
-
-        zoom_in_btn = ctk.CTkButton(self.zoom_controls, text="🔍+", command=self._zoom_in,
-                       fg_color=UI_COLORS['BUTTON_PRIMARY'], text_color=UI_COLORS['BUTTON_TEXT'], hover_color=UI_COLORS['BUTTON_PRIMARY_HOVER'],
-                       width=45, height=45, font=("Arial", 16, "bold"), corner_radius=8)
-        zoom_in_btn.pack(pady=(0, 8))
-
-        zoom_out_btn = ctk.CTkButton(self.zoom_controls, text="🔍-", command=self._zoom_out,
-                       fg_color=UI_COLORS['BUTTON_PRIMARY'], text_color=UI_COLORS['BUTTON_TEXT'], hover_color=UI_COLORS['BUTTON_PRIMARY_HOVER'],
-                       width=45, height=45, font=("Arial", 16, "bold"), corner_radius=8)
-        zoom_out_btn.pack(pady=(0, 8))
-
-        fullscreen_btn = ctk.CTkButton(self.zoom_controls, text="⛶", command=self._open_fullscreen_canvas,
-                         fg_color=UI_COLORS['BUTTON_PRIMARY'], text_color=UI_COLORS['BUTTON_TEXT'], hover_color=UI_COLORS['BUTTON_PRIMARY_HOVER'],
-                         width=45, height=45, font=("Arial", 16, "bold"), corner_radius=8)
-        fullscreen_btn.pack()
-        
         # Bind canvas resize
         self.center_column.bind("<Configure>", self._on_canvas_resize)
         self.canvas.bind("<ButtonPress-1>", self._pan_start)
