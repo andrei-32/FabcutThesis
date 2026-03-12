@@ -24,8 +24,8 @@ class ToolpathGenerator:
     """
     
     def __init__(self, 
-                 cutting_height: float = -0.5,  # Plunge depth below work surface
-                 safe_height: float = -2.0,  # Safe height during toolpath execution
+                 cutting_height: float = -2.0,  # Plunge depth below work surface
+                 safe_height: float = 0.0,  # Blade fully retracted (Z home) when travelling
                  corner_angle_threshold: float = 15.0,  # Increased from 5.0 to be less sensitive to curves
                  feed_rate: float = 3000.0,
                  plunge_rate: float = 3000.0):
@@ -34,7 +34,7 @@ class ToolpathGenerator:
         
         Args:
             cutting_height: Z height when cutting (negative = below work surface)
-            safe_height: Z height when moving between cuts (negative = below work surface)
+            safe_height: Z height when travelling between cuts (0.0 = blade fully retracted at home)
             corner_angle_threshold: Angle in degrees above which to raise Z at corners
             feed_rate: Feed rate for cutting moves (inches/min)
             plunge_rate: Feed rate for Z plunges (inches/min)
@@ -46,7 +46,7 @@ class ToolpathGenerator:
         self.plunge_rate = plunge_rate
         self.current_z = safe_height  # Track current Z position
         self.current_a = 0.0  # Track current A position for continuous rotation
-        self.a_scaling_factor = 561.0  # Calibrated A-axis scaling (matches manual jog scaling)
+        self.a_scaling_factor = 5.31  # Calibrated A-axis scaling: 1 inch ≈ 1910° → 1910/360 ≈ 5.31
         
     def generate_toolpath(self, shapes: Dict[str, List[Tuple[float, float]]]) -> str:
         """
@@ -572,8 +572,8 @@ def main():
     # Initialize processors
     dxf_processor = DXFProcessor()
     toolpath_generator = ToolpathGenerator(
-        cutting_height=-0.5,
-        safe_height=-2.0,
+        cutting_height=-2.0,
+        safe_height=0.0,
         corner_angle_threshold=15.0,  # Match main_app setting
         feed_rate=3000.0,
         plunge_rate=3000.0
