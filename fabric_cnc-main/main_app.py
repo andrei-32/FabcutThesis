@@ -589,7 +589,7 @@ class FabricCNCApp:
             self.title = ctk.CTkLabel(self.app_bar, image=_logo_img, text="")
         except Exception:
             self.title = ctk.CTkLabel(self.app_bar, text="FABCUT", text_color=UI_COLORS['ON_PRIMARY'], font=("Arial", 25, "bold"))
-        self.title.grid(row=0, column=0, padx=(24, 4), pady=UI_PADDING['SMALL'], sticky="w")
+        self.title.grid(row=0, column=0, padx=(24, 6), pady=UI_PADDING['SMALL'], sticky="w")
         
         # Status display in the middle-right
         status_frame = ctk.CTkFrame(self.app_bar, fg_color="transparent")
