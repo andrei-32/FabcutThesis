@@ -130,6 +130,11 @@ class ToolpathGenerator:
         
         gcode_lines = []
         gcode_lines.append(f"; Shape: {shape_name}")
+
+        is_circle_like = self._is_circle_like(points)
+        rotation_sign = -1.0 if is_circle_like else 1.0
+        if is_circle_like:
+            logger.info(f"Applying circle A-direction inversion for shape: {shape_name}")
         
         # Move to start point
         first_point = points[0]
@@ -137,7 +142,7 @@ class ToolpathGenerator:
         
         # Set initial A rotation and plunge
         if len(points) > 1:
-            target_a = self._calculate_z_rotation(first_point, points[1])
+            target_a = self._calculate_z_rotation(first_point, points[1], rotation_sign=rotation_sign)
             self.current_a = self._calculate_continuous_a(target_a)
             gcode_lines.append(f"G0 A{self.current_a:.4f} ; Set initial blade angle")
         
@@ -156,17 +161,17 @@ class ToolpathGenerator:
                 if angle_change > 15.0:  # Angle change > 15 degrees
                     # Lift Z, rotate A, lower Z
                     gcode_lines.append(f"G0 Z{self.safe_height} ; Raise Z for corner")
-                    target_a = self._calculate_z_rotation(current_point, next_point)
+                    target_a = self._calculate_z_rotation(current_point, next_point, rotation_sign=rotation_sign)
                     self.current_a = self._calculate_continuous_a(target_a)
                     gcode_lines.append(f"G0 A{self.current_a:.4f} ; Rotate blade for new direction")
                     gcode_lines.append(f"G0 Z{self.cutting_height} ; Lower Z to cutting height")
                 else:
                     # No corner, just update A angle
-                    target_a = self._calculate_z_rotation(current_point, next_point)
+                    target_a = self._calculate_z_rotation(current_point, next_point, rotation_sign=rotation_sign)
                     self.current_a = self._calculate_continuous_a(target_a)
             else:
                 # First segment, just update A angle
-                target_a = self._calculate_z_rotation(current_point, next_point)
+                target_a = self._calculate_z_rotation(current_point, next_point, rotation_sign=rotation_sign)
                 self.current_a = self._calculate_continuous_a(target_a)
             
             # Cut to next point
@@ -177,6 +182,31 @@ class ToolpathGenerator:
         gcode_lines.append("")
         
         return gcode_lines
+
+    def _is_circle_like(self, points: List[Tuple[float, float]]) -> bool:
+        """Heuristic circle detection for applying circle-specific A-axis direction handling."""
+        if len(points) < 8:
+            return False
+
+        # Circle candidates should be closed or nearly closed.
+        first_point = points[0]
+        last_point = points[-1]
+        closure = math.sqrt((first_point[0] - last_point[0])**2 + (first_point[1] - last_point[1])**2)
+        if closure > 0.2:
+            return False
+
+        cx = sum(p[0] for p in points) / len(points)
+        cy = sum(p[1] for p in points) / len(points)
+        radii = [math.sqrt((p[0] - cx)**2 + (p[1] - cy)**2) for p in points]
+        mean_r = sum(radii) / len(radii)
+        if mean_r < 1e-6:
+            return False
+
+        variance = sum((r - mean_r)**2 for r in radii) / len(radii)
+        rel_std = math.sqrt(variance) / mean_r
+
+        # Keep threshold modest to include splined circles but reject most polygons.
+        return rel_std < 0.12
     
     def _calculate_line_angle_change(self, p1: Tuple[float, float], p2: Tuple[float, float], p3: Tuple[float, float]) -> float:
         """
@@ -369,7 +399,7 @@ class ToolpathGenerator:
         
         return angle_degrees
     
-    def _calculate_z_rotation(self, point1: Tuple[float, float], point2: Tuple[float, float]) -> float:
+    def _calculate_z_rotation(self, point1: Tuple[float, float], point2: Tuple[float, float], rotation_sign: float = 1.0) -> float:
         """
         Calculate A-axis position to make cutting blade parallel to line segment.
         Blade zero is aligned with the +X axis.
@@ -377,6 +407,7 @@ class ToolpathGenerator:
         Args:
             point1: First point (x, y)
             point2: Second point (x, y)
+            rotation_sign: +1 for default direction, -1 to invert direction
             
         Returns:
             A-axis position in GRBL A units
@@ -388,7 +419,7 @@ class ToolpathGenerator:
         angle_radians = math.atan2(dy, dx)
 
         # Convert directly to degrees with X-axis as zero reference.
-        adjusted_angle = math.degrees(angle_radians)
+        adjusted_angle = rotation_sign * math.degrees(angle_radians)
         
         # Normalize angle to 0-360 range
         while adjusted_angle < 0:
