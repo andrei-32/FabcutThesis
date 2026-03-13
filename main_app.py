@@ -1417,9 +1417,8 @@ class FabricCNCApp:
                     
                     # Calculate arrow direction
                     arrow_length = 15
-                    # Match toolpath generator: negate angle and add 90 degrees
-                    adjusted_angle_deg = -a_deg + 90.0
-                    angle_rad = math.radians(adjusted_angle_deg)
+                    # Match toolpath generator: 0 deg is +X, +90 deg is +Y.
+                    angle_rad = math.radians(a_deg)
                     
                     # Account for canvas Y-axis inversion (Tkinter Y is top-down)
                     # In machine coordinates: positive Y is up, positive X is right

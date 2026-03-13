@@ -372,7 +372,7 @@ class ToolpathGenerator:
     def _calculate_z_rotation(self, point1: Tuple[float, float], point2: Tuple[float, float]) -> float:
         """
         Calculate A-axis position to make cutting blade parallel to line segment.
-        Tool starts parallel to Y-axis, so we need to adjust by 90 degrees.
+        Blade zero is aligned with the +X axis.
         
         Args:
             point1: First point (x, y)
@@ -384,14 +384,11 @@ class ToolpathGenerator:
         dx = point2[0] - point1[0]
         dy = point2[1] - point1[1]
         
-        # Calculate angle from X-axis (negate to fix direction)
+        # Calculate segment angle from +X axis.
         angle_radians = math.atan2(dy, dx)
-        
-        # Convert to degrees and negate to flip direction
-        angle_degrees = -math.degrees(angle_radians)
-        
-        # Adjust for tool starting parallel to Y-axis (add 90 degrees)
-        adjusted_angle = angle_degrees + 90.0
+
+        # Convert directly to degrees with X-axis as zero reference.
+        adjusted_angle = math.degrees(angle_radians)
         
         # Normalize angle to 0-360 range
         while adjusted_angle < 0:
