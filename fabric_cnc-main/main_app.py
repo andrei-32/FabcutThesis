@@ -2385,9 +2385,9 @@ class FabricCNCApp:
         pos_axis = axis
         
         # Scale down A-axis jog for finer control.
-        # Baseline after fixing jog command precision in controller.
+        # Tuned so one A jog click is approximately 10 degrees.
         if axis == 'A':
-            delta = delta / 414.0
+            delta = delta / 828.0
             
         # Check if position data has the requested axis
         if pos_axis not in current_pos:
