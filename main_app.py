@@ -2463,11 +2463,11 @@ class FabricCNCApp:
         # Position data uses the same axis names now
         pos_axis = axis
         
-        # Scale A-axis jog: jog_size (inches) × 10 = degrees moved.
-        # Calibrated: scale constant = 1656 deg/GRBL-unit → divisor = 5×1656/50 = 165.6
-        # (jog_size=5 → 50°, jog_size=1 → 10°)
+        # Scale A-axis jog using field calibration.
+        # Measured at current settings: 42 clicks = 180 deg -> 4.2857 deg/click.
+        # Target: 10 deg/click, so divisor scales by (4.2857 / 10) -> 165.6 * 0.42857 ≈ 71.0.
         if axis == 'A':
-            delta = delta / 165.6
+            delta = delta / 71.0
         
         # Check if position data has the requested axis
         if pos_axis not in current_pos:
