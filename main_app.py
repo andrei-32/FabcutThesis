@@ -477,9 +477,10 @@ class FabricCNCApp:
         self._jog_slider_scale = 0.05  # Scale factor for slider (0.05 inch increments)
         self.z_jog_size = 2.0 / 2.54  # Fixed Z jog per click: 2 cm in inches
         # A-axis calibration shared by jog and toolpath generation.
-        # Derived from field calibration with this machine/driver setup.
+        # With this setup: 1 jog inch command corresponds to 10 blade degrees.
         self.a_jog_divisor = 71.0
-        self.a_axis_scaling_factor = (self.a_jog_divisor * 10.0) / (5.0 * 360.0)
+        self.a_jog_degrees_per_inch = 10.0
+        self.a_degrees_per_grbl_unit = self.a_jog_divisor * self.a_jog_degrees_per_inch
         
         # Z lower limit control
         self.z_lower_limit = -2.0  # Runtime adjustable Z lower limit
@@ -592,7 +593,7 @@ class FabricCNCApp:
                 corner_angle_threshold=15.0,  # 15-degree threshold for basic approach
                 feed_rate=6000.0,  # Increased from 3000 for faster cutting
                 plunge_rate=6000.0,  # Increased from 3000 for faster plunges
-                a_axis_scaling_factor=self.a_axis_scaling_factor
+                a_degrees_per_grbl_unit=self.a_degrees_per_grbl_unit
             )
             self.gcode_visualizer = GCodeVisualizer()
             self._dxf_initialized = True
@@ -1408,11 +1409,11 @@ class FabricCNCApp:
             for i in arrow_indices:
                 if i < len(positions):
                     x_in, y_in = positions[i]
-                    a_inches = orientations[i]  # A-axis value in inches
+                    a_units = orientations[i]  # A-axis value in calibrated GRBL units
                     x_canvas, y_canvas = self._inches_to_canvas(x_in, y_in, canvas_width, canvas_height)
                     
-                    # Convert A-axis inches to degrees: 1 inch = 360 degrees
-                    a_deg = a_inches * 360.0
+                    # Convert calibrated GRBL A units to physical blade angle.
+                    a_deg = a_units * self.a_degrees_per_grbl_unit
                     
                     # Calculate arrow direction
                     arrow_length = 15
@@ -2471,7 +2472,7 @@ class FabricCNCApp:
         # Scale A-axis jog using field calibration.
         # Keep this synchronized with toolpath generation calibration.
         if axis == 'A':
-            delta = delta / self.a_jog_divisor
+            delta = (delta * self.a_jog_degrees_per_inch) / self.a_degrees_per_grbl_unit
         
         # Check if position data has the requested axis
         if pos_axis not in current_pos:
