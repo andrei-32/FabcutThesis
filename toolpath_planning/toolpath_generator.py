@@ -28,7 +28,8 @@ class ToolpathGenerator:
                  safe_height: float = 0.0,  # Blade fully retracted (Z home) when travelling
                  corner_angle_threshold: float = 15.0,  # Increased from 5.0 to be less sensitive to curves
                  feed_rate: float = 3000.0,
-                 plunge_rate: float = 3000.0):
+                 plunge_rate: float = 3000.0,
+                 a_axis_scaling_factor: float = 0.3944):
         """
         Initialize the toolpath generator.
         
@@ -46,7 +47,7 @@ class ToolpathGenerator:
         self.plunge_rate = plunge_rate
         self.current_z = safe_height  # Track current Z position
         self.current_a = 0.0  # Track current A position for continuous rotation
-        self.a_scaling_factor = 5.31  # Calibrated A-axis scaling: 1 inch ≈ 1910° → 1910/360 ≈ 5.31
+        self.a_scaling_factor = a_axis_scaling_factor  # Hardware-calibrated A-axis scaling
         
     def generate_toolpath(self, shapes: Dict[str, List[Tuple[float, float]]]) -> str:
         """

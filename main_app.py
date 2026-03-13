@@ -476,6 +476,10 @@ class FabricCNCApp:
         self.jog_size_var = ctk.DoubleVar(value=1.0)  # Default to 1 inch
         self._jog_slider_scale = 0.05  # Scale factor for slider (0.05 inch increments)
         self.z_jog_size = 2.0 / 2.54  # Fixed Z jog per click: 2 cm in inches
+        # A-axis calibration shared by jog and toolpath generation.
+        # Derived from field calibration with this machine/driver setup.
+        self.a_jog_divisor = 71.0
+        self.a_axis_scaling_factor = (self.a_jog_divisor * 10.0) / (5.0 * 360.0)
         
         # Z lower limit control
         self.z_lower_limit = -2.0  # Runtime adjustable Z lower limit
@@ -587,7 +591,8 @@ class FabricCNCApp:
                 safe_height=0.0,  # Fully retract blade (Z home) when travelling between cuts
                 corner_angle_threshold=15.0,  # 15-degree threshold for basic approach
                 feed_rate=6000.0,  # Increased from 3000 for faster cutting
-                plunge_rate=6000.0  # Increased from 3000 for faster plunges
+                plunge_rate=6000.0,  # Increased from 3000 for faster plunges
+                a_axis_scaling_factor=self.a_axis_scaling_factor
             )
             self.gcode_visualizer = GCodeVisualizer()
             self._dxf_initialized = True
@@ -2464,10 +2469,9 @@ class FabricCNCApp:
         pos_axis = axis
         
         # Scale A-axis jog using field calibration.
-        # Measured at current settings: 42 clicks = 180 deg -> 4.2857 deg/click.
-        # Target: 10 deg/click, so divisor scales by (4.2857 / 10) -> 165.6 * 0.42857 ≈ 71.0.
+        # Keep this synchronized with toolpath generation calibration.
         if axis == 'A':
-            delta = delta / 71.0
+            delta = delta / self.a_jog_divisor
         
         # Check if position data has the requested axis
         if pos_axis not in current_pos:
