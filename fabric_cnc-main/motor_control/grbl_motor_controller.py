@@ -334,8 +334,8 @@ class GrblMotorController:
                 "$21": "0",       # Hard limits disable (prevent A-axis limit issues)
                 "$22": "1",       # Homing cycle enable
                 "$23": "3",       # Homing direction mask (X=1, Y=1, Z=0, A=0 - X&Y home positive, Z&A home negative)
-                "$24": "500.00",   # Homing seek rate
-                "$25": "1500.00",    # Homing feed/locate rate
+                "$24": "120.0",   # Homing feed/locate rate (slower, accurate switch re-approach)
+                "$25": "400.0",   # Homing seek rate (faster initial search)
                 "$26": "250",     # Homing debounce
                 "$27": f"{MACHINE_CONFIG['HOMING_OFFSET'] * 25.4:.3f}",   # Homing pull-off from config (convert inches to mm)
                 "$28": "0.000",   # Homing locate feed rate
@@ -767,17 +767,17 @@ class GrblMotorController:
         self.send("$21=0")
         time.sleep(0.5)
         
-        # Home axes sequentially using mask + $H for better compatibility.
-        axis_masks = [("X", "1"), ("Y", "2"), ("Z", "4"), ("A", "8")]
+        # Home axes sequentially for predictable behavior.
+        axis_masks = [("X", "1"), ("Y", "2"), ("Z", "4")]
         for axis_name, axis_mask in axis_masks:
             logger.info(f"Homing {axis_name} axis...")
 
             axis_homed = False
             last_error = "unknown"
-            for attempt in range(1, 3):
+            for attempt in range(1, 4):
                 self._drain_ack_queue()
 
-                # Clear alarm/lockout before each homing attempt.
+                # Clear lockout before each attempt.
                 self.send("$X")
                 time.sleep(0.2)
 
@@ -790,29 +790,30 @@ class GrblMotorController:
 
                 self.send("$H")
                 ok, response = self._send_and_wait_response(timeout=25.0)
-                if ok:
-                    done_ok, done_info = self._wait_for_homing_motion_complete(timeout=30.0)
-                    if done_ok:
-                        axis_homed = True
-                        logger.info(f"{axis_name} homing complete. {done_info}")
-                        break
-                    last_error = done_info
-                    logger.warning(f"{axis_name} attempt {attempt} did not complete: {done_info}")
+                if not ok:
+                    last_error = response
+                    logger.warning(f"{axis_name} attempt {attempt} failed: {response}")
+                    if response in ("error:9", "error:79"):
+                        self.send("$X")
+                        time.sleep(0.3)
                     continue
 
-                last_error = response
-                logger.warning(f"{axis_name} attempt {attempt} failed: {response}")
-                if response in ("error:9", "error:79"):
-                    self.send("$X")
-                    time.sleep(0.3)
+                done_ok, done_info = self._wait_for_homing_motion_complete(timeout=45.0)
+                if done_ok:
+                    axis_homed = True
+                    logger.info(f"{axis_name} homing complete. {done_info}")
+                    break
+
+                last_error = done_info
+                logger.warning(f"{axis_name} attempt {attempt} did not complete: {done_info}")
 
             if not axis_homed:
                 raise RuntimeError(f"{axis_name} homing failed after retries: {last_error}")
 
-        # Restore profile default mask after sequential homing.
+        # Restore default XYZ mask after sequential cycle.
         self.send("$44=7")
         self._send_and_wait_response(timeout=3.0)
-        logger.info("All axes homed sequentially")
+        logger.info("Sequential homing complete for X, Y, Z")
         
         # Wait for machine to stabilize and get final MACHINE position
         logger.info("Waiting for machine to stabilize after homing...")
