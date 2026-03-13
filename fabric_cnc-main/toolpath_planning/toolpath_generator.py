@@ -45,8 +45,10 @@ class ToolpathGenerator:
         self.feed_rate = feed_rate
         self.plunge_rate = plunge_rate
         self.current_z = safe_height  # Track current Z position
-        self.current_a = 0.0  # Track current A position for continuous rotation
-        self.a_scaling_factor = 250  # Calibrated A-axis scaling (matches manual jog scaling)
+        self.current_a = 0.0  # Track current A position in GRBL A units
+        # Keep A-axis conversion consistent with manual jog calibration in main_app.
+        self.a_degrees_per_grbl_unit = 1656.0
+        self.a_units_per_revolution = 360.0 / self.a_degrees_per_grbl_unit
         
     def generate_toolpath(self, shapes: Dict[str, List[Tuple[float, float]]]) -> str:
         """
@@ -377,7 +379,7 @@ class ToolpathGenerator:
             point2: Second point (x, y)
             
         Returns:
-            A-axis position in inches (1 inch = 360 degrees)
+            A-axis position in GRBL A units
         """
         dx = point2[0] - point1[0]
         dy = point2[1] - point1[1]
@@ -397,37 +399,33 @@ class ToolpathGenerator:
         while adjusted_angle >= 360:
             adjusted_angle -= 360.0
         
-        # Convert to inches: 1 inch = 360 degrees
-        a_position_inches = adjusted_angle / 360.0
-            # Apply calibrated scaling factor to match motor behavior
-        a_position_inches = a_position_inches / self.a_scaling_factor
-        
-        
+        # Convert physical blade angle to calibrated GRBL A units.
+        a_position_grbl_units = adjusted_angle / self.a_degrees_per_grbl_unit
+
         # Round to 4 decimal places to reduce precision issues
-        return round(a_position_inches, 4)
+        return round(a_position_grbl_units, 4)
     
     def _calculate_continuous_a(self, target_a: float) -> float:
         """
         Calculate continuous A-axis position to avoid unnecessary 360° rotations.
         
         Args:
-            target_a: Target A position (0.0 to 1.0)
+            target_a: Target A position in GRBL A units
             
         Returns:
             Continuous A position that takes shortest path from current position
         """
-        # Calculate the difference between target and current
-        diff = target_a - (self.current_a % 1.0)  # Normalize current_a to 0-1 range
-        
-        # If difference is greater than 0.5, it's shorter to go the other way
-        if diff > 0.5:
-            # Go backwards (subtract 1.0)
-            continuous_a = self.current_a + diff - 1.0
-        elif diff < -0.5:
-            # Go forwards (add 1.0)
-            continuous_a = self.current_a + diff + 1.0
+        # Normalize current value to one revolution span in GRBL units.
+        span = self.a_units_per_revolution
+        diff = target_a - (self.current_a % span)
+
+        # Choose the shortest wrap-around move within one revolution span.
+        half_span = span / 2.0
+        if diff > half_span:
+            continuous_a = self.current_a + diff - span
+        elif diff < -half_span:
+            continuous_a = self.current_a + diff + span
         else:
-            # Direct path is shortest
             continuous_a = self.current_a + diff
         
         # Update current position

@@ -53,6 +53,11 @@ logger = logging.getLogger("fabric_cnc.main_app")
 ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("blue")  # Using blue base theme with custom maroon colors in UI_COLORS
 
+# A-axis calibration for this GRBL setup.
+# Manual calibration found that 1 GRBL A unit produces ~1656 degrees of blade rotation.
+A_AXIS_DEGREES_PER_GRBL_UNIT = 1656.0
+A_AXIS_JOG_DEGREES_PER_INCH = 10.0
+
 def calculate_angle_between_points(p1, p2, p3):
     """Calculate the angle between three points (p1 -> p2 -> p3) in degrees."""
     if p1 == p2 or p2 == p3:
@@ -1365,11 +1370,11 @@ class FabricCNCApp:
             for i in arrow_indices:
                 if i < len(positions):
                     x_in, y_in = positions[i]
-                    a_inches = orientations[i]  # A-axis value in inches
+                    a_units = orientations[i]  # A-axis value in GRBL units
                     x_canvas, y_canvas = self._inches_to_canvas(x_in, y_in)
                     
-                    # Convert A-axis inches to degrees: 1 inch = 360 degrees
-                    a_deg = a_inches * 360.0
+                    # Convert calibrated GRBL A units to physical blade angle in degrees.
+                    a_deg = a_units * A_AXIS_DEGREES_PER_GRBL_UNIT
                     
                     # Calculate arrow direction
                     arrow_length = 15
@@ -2384,11 +2389,9 @@ class FabricCNCApp:
         # Position data uses the same axis names now
         pos_axis = axis
         
-        # Scale A-axis jog: jog_size (inches) × 10 = degrees moved.
-        # Calibrated from observation: scale constant = 1656 deg/GRBL-unit.
-        # new_divisor = 5 × 1656 / 50 = 165.6  (jog_size=5 → 50°, jog_size=1 → 10°)
+        # Convert UI jog inches to desired blade degrees, then map to GRBL A units.
         if axis == 'A':
-            delta = delta / 165.6
+            delta = (delta * A_AXIS_JOG_DEGREES_PER_INCH) / A_AXIS_DEGREES_PER_GRBL_UNIT
             
         # Check if position data has the requested axis
         if pos_axis not in current_pos:
