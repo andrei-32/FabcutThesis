@@ -475,6 +475,7 @@ class FabricCNCApp:
         self.jog_size = 1.0  # Default to 1 inch
         self.jog_size_var = ctk.DoubleVar(value=1.0)  # Default to 1 inch
         self._jog_slider_scale = 0.05  # Scale factor for slider (0.05 inch increments)
+        self.z_jog_size = 2.0 / 2.54  # Fixed Z jog per click: 2 cm in inches
         
         # Z lower limit control
         self.z_lower_limit = -2.0  # Runtime adjustable Z lower limit
@@ -842,9 +843,9 @@ class FabricCNCApp:
         self._add_compact_jog_button(motor_section, "◀", lambda: self._jog('X', -self.jog_size)).grid(row=2, column=0, padx=8, pady=3, sticky="nsew")
         self._add_compact_jog_button(motor_section, "▶", lambda: self._jog('X', +self.jog_size)).grid(row=2, column=1, padx=8, pady=3, sticky="nsew")
         self._add_compact_jog_button(motor_section, "▼", lambda: self._jog('Y', -self.jog_size)).grid(row=3, column=0, columnspan=2, padx=8, pady=3, sticky="nsew")
-        # Z and A controls - compact
-        self._add_compact_jog_button(motor_section, "Z+", lambda: self._jog('Z', +self.jog_size)).grid(row=4, column=0, padx=8, pady=3, sticky="nsew")
-        self._add_compact_jog_button(motor_section, "Z-", lambda: self._jog('Z', -self.jog_size)).grid(row=4, column=1, padx=8, pady=3, sticky="nsew")
+        # Z uses a fixed 2 cm jog increment to protect the smaller motor.
+        self._add_compact_jog_button(motor_section, "Z+", lambda: self._jog('Z', +self.z_jog_size)).grid(row=4, column=0, padx=8, pady=3, sticky="nsew")
+        self._add_compact_jog_button(motor_section, "Z-", lambda: self._jog('Z', -self.z_jog_size)).grid(row=4, column=1, padx=8, pady=3, sticky="nsew")
         self._add_compact_jog_button(motor_section, "A+", lambda: self._jog('A', +self.jog_size)).grid(row=5, column=0, padx=8, pady=3, sticky="nsew")
         self._add_compact_jog_button(motor_section, "A-", lambda: self._jog('A', -self.jog_size)).grid(row=5, column=1, padx=8, pady=3, sticky="nsew")
         
@@ -975,10 +976,10 @@ class FabricCNCApp:
             delta = -self.jog_size
         elif key == 'Page_Up':
             axis = 'Z'
-            delta = self.jog_size
+            delta = self.z_jog_size
         elif key == 'Page_Down':
             axis = 'Z'
-            delta = -self.jog_size
+            delta = -self.z_jog_size
         elif key == 'Home':
             axis = 'A'
             delta = self.jog_size  # Use same as other axes
@@ -2462,10 +2463,11 @@ class FabricCNCApp:
         # Position data uses the same axis names now
         pos_axis = axis
         
-        # Scale down A-axis jog for finer control.
-        # Calibrated from latest field test: 36 clicks currently ~=190°, target is 360°.
+        # Scale A-axis jog: jog_size (inches) × 10 = degrees moved.
+        # Calibrated: scale constant = 1656 deg/GRBL-unit → divisor = 5×1656/50 = 165.6
+        # (jog_size=5 → 50°, jog_size=1 → 10°)
         if axis == 'A':
-            delta = delta / 362.0
+            delta = delta / 165.6
         
         # Check if position data has the requested axis
         if pos_axis not in current_pos:
