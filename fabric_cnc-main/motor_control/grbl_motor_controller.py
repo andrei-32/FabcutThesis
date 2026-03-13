@@ -334,8 +334,8 @@ class GrblMotorController:
                 "$21": "0",       # Hard limits disable (prevent A-axis limit issues)
                 "$22": "1",       # Homing cycle enable
                 "$23": "3",       # Homing direction mask (X=1, Y=1, Z=0, A=0 - X&Y home positive, Z&A home negative)
-                "$24": "400.0",   # Homing seek rate (quiet profile)
-                "$25": "140.0",    # Homing feed/locate rate (quiet profile)
+                "$24": "500.00",   # Homing seek rate
+                "$25": "1500.00",    # Homing feed/locate rate
                 "$26": "250",     # Homing debounce
                 "$27": f"{MACHINE_CONFIG['HOMING_OFFSET'] * 25.4:.3f}",   # Homing pull-off from config (convert inches to mm)
                 "$28": "0.000",   # Homing locate feed rate
