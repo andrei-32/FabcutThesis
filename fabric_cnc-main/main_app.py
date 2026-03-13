@@ -449,6 +449,7 @@ class FabricCNCApp:
         self.jog_size = 1.0  # Default to 1 inch
         self.jog_size_var = ctk.DoubleVar(value=1.0)  # Default to 1 inch
         self._jog_slider_scale = 0.05  # Scale factor for slider (0.05 inch increments)
+        self.z_jog_size = 2.0 / 2.54  # Fixed Z jog per click: 2 cm in inches
         
         # Z lower limit control
         self.z_lower_limit = -2.0  # Runtime adjustable Z lower limit
@@ -786,9 +787,9 @@ class FabricCNCApp:
         self._add_compact_jog_button(motor_section, "→", lambda: self._jog('X', +self.jog_size)).grid(row=2, column=1, padx=UI_PADDING['MEDIUM'], pady=UI_PADDING['BUTTON_SPACING'], sticky="nsew")
         self._add_compact_jog_button(motor_section, "↓", lambda: self._jog('Y', -self.jog_size)).grid(row=3, column=0, columnspan=2, padx=UI_PADDING['MEDIUM'], pady=UI_PADDING['BUTTON_SPACING'], sticky="nsew")
         
-        # Z and A controls - now using jog_size with better spacing
-        self._add_compact_jog_button(motor_section, "Z+", lambda: self._jog('Z', +self.jog_size)).grid(row=4, column=0, padx=UI_PADDING['MEDIUM'], pady=UI_PADDING['BUTTON_SPACING'], sticky="nsew")
-        self._add_compact_jog_button(motor_section, "Z-", lambda: self._jog('Z', -self.jog_size)).grid(row=4, column=1, padx=UI_PADDING['MEDIUM'], pady=UI_PADDING['BUTTON_SPACING'], sticky="nsew")
+        # Z uses a fixed 2 cm jog increment to protect the smaller motor.
+        self._add_compact_jog_button(motor_section, "Z+", lambda: self._jog('Z', +self.z_jog_size)).grid(row=4, column=0, padx=UI_PADDING['MEDIUM'], pady=UI_PADDING['BUTTON_SPACING'], sticky="nsew")
+        self._add_compact_jog_button(motor_section, "Z-", lambda: self._jog('Z', -self.z_jog_size)).grid(row=4, column=1, padx=UI_PADDING['MEDIUM'], pady=UI_PADDING['BUTTON_SPACING'], sticky="nsew")
         self._add_compact_jog_button(motor_section, "A+", lambda: self._jog('A', +self.jog_size)).grid(row=5, column=0, padx=UI_PADDING['MEDIUM'], pady=UI_PADDING['BUTTON_SPACING'], sticky="nsew")
         self._add_compact_jog_button(motor_section, "A-", lambda: self._jog('A', -self.jog_size)).grid(row=5, column=1, padx=UI_PADDING['MEDIUM'], pady=UI_PADDING['BUTTON_SPACING'], sticky="nsew")
         
@@ -889,10 +890,10 @@ class FabricCNCApp:
             delta = -self.jog_size
         elif key == 'Page_Up':
             axis = 'Z'
-            delta = self.jog_size
+            delta = self.z_jog_size
         elif key == 'Page_Down':
             axis = 'Z'
-            delta = -self.jog_size
+            delta = -self.z_jog_size
         elif key == 'Home':
             axis = 'A'
             delta = self.jog_size  # Use same as other axes
