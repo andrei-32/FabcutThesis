@@ -49,6 +49,7 @@ class ToolpathGenerator:
         self.current_a = 0.0  # Track current A position in GRBL A units
         self.a_degrees_per_grbl_unit = a_degrees_per_grbl_unit
         self.a_units_per_revolution = 360.0 / self.a_degrees_per_grbl_unit
+        self.last_a_direction = 0  # -1 or +1 once motion direction is established
         
     def generate_toolpath(self, shapes: Dict[str, List[Tuple[float, float]]]) -> str:
         """
@@ -73,6 +74,7 @@ class ToolpathGenerator:
             logger.info(f"Generating toolpath for {shape_name} with {len(points)} points")
             # Reset A position tracking for each new shape
             self.current_a = 0.0
+            self.last_a_direction = 0
             
             # Find best starting point (corner if available)
             optimized_points = self._optimize_starting_point(points)
@@ -416,14 +418,24 @@ class ToolpathGenerator:
         span = self.a_units_per_revolution
         diff = target_a - (self.current_a % span)
 
-        # Choose shortest wrap-around path.
-        half_span = span / 2.0
-        if diff > half_span:
-            continuous_a = self.current_a + diff - span
-        elif diff < -half_span:
-            continuous_a = self.current_a + diff + span
+        # Candidate deltas to reach the same target orientation.
+        candidates = [diff, diff - span, diff + span]
+
+        # Preserve established turning direction (important for circles crossing 0/360).
+        if self.last_a_direction > 0:
+            directional = [d for d in candidates if d > 1e-9]
+            chosen_diff = min(directional, key=abs) if directional else min(candidates, key=abs)
+        elif self.last_a_direction < 0:
+            directional = [d for d in candidates if d < -1e-9]
+            chosen_diff = min(directional, key=abs) if directional else min(candidates, key=abs)
         else:
-            continuous_a = self.current_a + diff
+            chosen_diff = min(candidates, key=abs)
+
+        continuous_a = self.current_a + chosen_diff
+
+        # Lock in direction once a meaningful move is observed.
+        if abs(chosen_diff) > 1e-9:
+            self.last_a_direction = 1 if chosen_diff > 0 else -1
         
         # Update current position
         self.current_a = continuous_a
