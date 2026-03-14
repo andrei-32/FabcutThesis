@@ -339,8 +339,8 @@ class GrblMotorController:
                 "$25": "40.0",    # Homing feed/locate rate (quiet profile)
                 "$26": "250",     # Homing debounce
                 "$27": f"{MACHINE_CONFIG['HOMING_OFFSET'] * 25.4:.3f}",   # Homing pull-off from config (convert inches to mm)
-                "$28": "0.000",   # Homing locate feed rate
-                "$29": "0.0",     # Homing search seek rate
+                "$28": "120.0",   # Homing locate feed rate (match $24)
+                "$29": "40.0",    # Homing search seek rate (match $25)
                 "$30": "1000.000", # Spindle max rpm
                 "$31": "0.000",   # Spindle min rpm
                 "$32": "0",       # Laser mode enable
