@@ -479,6 +479,7 @@ class FabricCNCApp:
         self.jog_size_var = ctk.DoubleVar(value=1.0)  # Default to 1 inch
         self._jog_slider_scale = 0.05  # Scale factor for slider (0.05 inch increments)
         self.z_jog_size = 0.5  # Fixed Z jog per click: 0.5 inch for safer clearance
+        self.a_jog_size = 1.0  # Fixed A jog input so each tap targets ~10 degrees
         # A-axis calibration shared by jog and toolpath generation.
         # With this setup: 1 jog inch command corresponds to 10 blade degrees.
         self.a_jog_divisor = 71.0
@@ -855,8 +856,8 @@ class FabricCNCApp:
         # Z uses a fixed jog increment to protect the smaller motor.
         self._add_compact_jog_button(motor_section, "Z+", lambda: self._jog('Z', +self.z_jog_size)).grid(row=4, column=0, padx=8, pady=3, sticky="nsew")
         self._add_compact_jog_button(motor_section, "Z-", lambda: self._jog('Z', -self.z_jog_size)).grid(row=4, column=1, padx=8, pady=3, sticky="nsew")
-        self._add_compact_jog_button(motor_section, "A+", lambda: self._jog('A', +self.jog_size)).grid(row=5, column=0, padx=8, pady=3, sticky="nsew")
-        self._add_compact_jog_button(motor_section, "A-", lambda: self._jog('A', -self.jog_size)).grid(row=5, column=1, padx=8, pady=3, sticky="nsew")
+        self._add_compact_jog_button(motor_section, "A+", lambda: self._jog('A', +self.a_jog_size)).grid(row=5, column=0, padx=8, pady=3, sticky="nsew")
+        self._add_compact_jog_button(motor_section, "A-", lambda: self._jog('A', -self.a_jog_size)).grid(row=5, column=1, padx=8, pady=3, sticky="nsew")
         
         # Jog size slider
         ctk.CTkLabel(motor_section, text="Jog Size:", font=("Arial", 11, "bold"), text_color=UI_COLORS['PRIMARY_COLOR']).grid(row=6, column=0, columnspan=2, pady=(6, 2), padx=8)
@@ -991,10 +992,10 @@ class FabricCNCApp:
             delta = -self.z_jog_size
         elif key == 'Home':
             axis = 'A'
-            delta = self.jog_size  # Use same as other axes
+            delta = self.a_jog_size
         elif key == 'End':
             axis = 'A'
-            delta = -self.jog_size  # Use same as other axes
+            delta = -self.a_jog_size
         if axis:
             if not self._jog_in_progress.get(axis, False):
                 self._jog_in_progress[axis] = True
