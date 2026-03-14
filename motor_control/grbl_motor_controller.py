@@ -797,11 +797,21 @@ class GrblMotorController:
                     logger.warning(f"{axis_name} attempt {attempt}: {last_error}")
                     continue
 
+                with self.status_lock:
+                    pre_state = self.machine_state
+                    pre_pins = getattr(self, 'last_limit_pins', "")
+                logger.info(
+                    f"{axis_name} attempt {attempt}: set $44={axis_mask}, pre-home state={pre_state}, pins={pre_pins}"
+                )
+
                 self.send("$H")
-                ok, response = self._send_and_wait_response(timeout=25.0)
+                # Some axes can legitimately take longer than 25s depending on distance and seek rate.
+                ok, response = self._send_and_wait_response(timeout=120.0)
                 if ok:
-                    done_ok, done_info = self._wait_for_homing_motion_complete(timeout=30.0)
+                    done_ok, done_info = self._wait_for_homing_motion_complete(timeout=120.0)
                     if done_ok:
+                        # Drain late acknowledgments before the next axis to avoid cross-axis response bleed.
+                        self._drain_ack_queue()
                         axis_homed = True
                         logger.info(f"{axis_name} homing complete. {done_info}")
                         break
