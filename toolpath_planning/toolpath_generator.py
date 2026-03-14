@@ -29,7 +29,8 @@ class ToolpathGenerator:
                  corner_angle_threshold: float = 15.0,  # Increased from 5.0 to be less sensitive to curves
                  feed_rate: float = 3000.0,
                  plunge_rate: float = 3000.0,
-                 a_degrees_per_grbl_unit: float = 710.0):
+                 a_degrees_per_grbl_unit: float = 710.0,
+                 a_rotation_sign: float = -1.0):
         """
         Initialize the toolpath generator.
         
@@ -49,6 +50,8 @@ class ToolpathGenerator:
         self.current_a = 0.0  # Track current A position in GRBL A units
         self.a_degrees_per_grbl_unit = a_degrees_per_grbl_unit
         self.a_units_per_revolution = 360.0 / self.a_degrees_per_grbl_unit
+        # Positive geometric angle maps opposite on this machine's A-axis wiring/firmware.
+        self.a_rotation_sign = -1.0 if a_rotation_sign < 0 else 1.0
         
     def generate_toolpath(self, shapes: Dict[str, List[Tuple[float, float]]]) -> str:
         """
@@ -131,10 +134,8 @@ class ToolpathGenerator:
         gcode_lines = []
         gcode_lines.append(f"; Shape: {shape_name}")
 
-        is_circle_like = self._is_circle_like(points)
-        rotation_sign = -1.0 if is_circle_like else 1.0
-        if is_circle_like:
-            logger.info(f"Applying circle A-direction inversion for shape: {shape_name}")
+        # Use one consistent A-axis direction for all geometries.
+        rotation_sign = self.a_rotation_sign
         
         # Move to start point
         first_point = points[0]

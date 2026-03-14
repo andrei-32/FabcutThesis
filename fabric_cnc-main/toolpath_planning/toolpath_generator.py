@@ -28,7 +28,8 @@ class ToolpathGenerator:
                  safe_height: float = -2.0,  # Safe height during toolpath execution
                  corner_angle_threshold: float = 15.0,  # Increased from 5.0 to be less sensitive to curves
                  feed_rate: float = 3000.0,
-                 plunge_rate: float = 3000.0):
+                 plunge_rate: float = 3000.0,
+                 a_rotation_sign: float = -1.0):
         """
         Initialize the toolpath generator.
         
@@ -49,6 +50,7 @@ class ToolpathGenerator:
         # Keep A-axis conversion consistent with manual jog calibration in main_app.
         self.a_degrees_per_grbl_unit = 1656.0
         self.a_units_per_revolution = 360.0 / self.a_degrees_per_grbl_unit
+        self.a_rotation_sign = -1.0 if a_rotation_sign < 0 else 1.0
         
     def generate_toolpath(self, shapes: Dict[str, List[Tuple[float, float]]]) -> str:
         """
@@ -387,8 +389,8 @@ class ToolpathGenerator:
         # Calculate angle from X-axis using the XY motion direction.
         angle_radians = math.atan2(dy, dx)
         
-        # Convert to degrees without inverting sign so diagonals are not mirrored.
-        angle_degrees = math.degrees(angle_radians)
+        # Apply machine-calibrated direction sign so blade angle follows path heading.
+        angle_degrees = self.a_rotation_sign * math.degrees(angle_radians)
         
         # Adjust for tool starting parallel to Y-axis (add 90 degrees)
         adjusted_angle = angle_degrees + 90.0
