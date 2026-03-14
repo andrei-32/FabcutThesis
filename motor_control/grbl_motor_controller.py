@@ -172,6 +172,7 @@ class GrblMotorController:
         self.response_callback = None  # Callback for manual command responses
         self.is_homed = False  # Track if machine is homed
         self.machine_state = "Unknown"  # Track GRBL state (Idle, Run, Hold, Alarm, etc.)
+        self.default_homing_cycle_mask = "7"  # Updated from configured $44 during GRBL setup
 
         self.reader_thread = threading.Thread(target=self._read_loop, daemon=True)
         self.writer_thread = threading.Thread(target=self._write_loop, daemon=True)
@@ -407,6 +408,9 @@ class GrblMotorController:
                 "$676": "3",       # WiFi mode
                 "$680": "0"        # Modbus enable
             }
+
+            # Keep track of the profile default homing mask so sequential homing can restore it.
+            self.default_homing_cycle_mask = settings.get("$44", "7")
             
             # Log the homing offset being used
             homing_offset = MACHINE_CONFIG['HOMING_OFFSET']
@@ -815,9 +819,10 @@ class GrblMotorController:
                 raise RuntimeError(f"{axis_name} homing failed after retries: {last_error}")
 
         # Restore profile default mask after sequential homing.
-        self.send("$44=7")
+        restore_mask = getattr(self, 'default_homing_cycle_mask', '7')
+        self.send(f"$44={restore_mask}")
         self._send_and_wait_response(timeout=3.0)
-        logger.info("All axes homed sequentially")
+        logger.info(f"All axes homed sequentially; restored $44={restore_mask}")
         
         # Wait for machine to stabilize and get final MACHINE position
         logger.info("Waiting for machine to stabilize after homing...")
