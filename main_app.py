@@ -226,6 +226,9 @@ class RealMotorController:
 
     def jog(self, axis, delta):
         try:
+            # Ensure manual jogs always run in inches even if prior G-code switched units.
+            self.motor_controller.send("G20")
+
             # Get current position from GRBL
             current_pos = self.get_position()
             current_val = current_pos.get(axis, 0.0)
@@ -849,7 +852,7 @@ class FabricCNCApp:
         self._add_compact_jog_button(motor_section, "◀", lambda: self._jog('X', -self.jog_size)).grid(row=2, column=0, padx=8, pady=3, sticky="nsew")
         self._add_compact_jog_button(motor_section, "▶", lambda: self._jog('X', +self.jog_size)).grid(row=2, column=1, padx=8, pady=3, sticky="nsew")
         self._add_compact_jog_button(motor_section, "▼", lambda: self._jog('Y', -self.jog_size)).grid(row=3, column=0, columnspan=2, padx=8, pady=3, sticky="nsew")
-        # Z uses a fixed 2 cm jog increment to protect the smaller motor.
+        # Z uses a fixed jog increment to protect the smaller motor.
         self._add_compact_jog_button(motor_section, "Z+", lambda: self._jog('Z', +self.z_jog_size)).grid(row=4, column=0, padx=8, pady=3, sticky="nsew")
         self._add_compact_jog_button(motor_section, "Z-", lambda: self._jog('Z', -self.z_jog_size)).grid(row=4, column=1, padx=8, pady=3, sticky="nsew")
         self._add_compact_jog_button(motor_section, "A+", lambda: self._jog('A', +self.jog_size)).grid(row=5, column=0, padx=8, pady=3, sticky="nsew")

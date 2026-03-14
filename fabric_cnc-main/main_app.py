@@ -231,6 +231,9 @@ class RealMotorController:
 
     def jog(self, axis, delta):
         try:
+            # Ensure manual jogs always run in inches even if prior G-code switched units.
+            self.motor_controller.send("G20")
+
             
             # Get current position from GRBL
             current_pos = self.get_position()
