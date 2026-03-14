@@ -335,12 +335,12 @@ class GrblMotorController:
                 "$21": "0",       # Hard limits disable (prevent A-axis limit issues)
                 "$22": "1",       # Homing cycle enable
                 "$23": "3",       # Homing direction mask (X=1, Y=1, Z=0, A=0 - X&Y home positive, Z&A home negative)
-                "$24": "120.0",   # Homing seek rate (quiet profile)
-                "$25": "40.0",    # Homing feed/locate rate (quiet profile)
+                "$24": "200.0",   # Homing feed/locate rate (mm/min) - slow precise approach
+                "$25": "3000.0",  # Homing seek rate (mm/min) - fast initial sweep
                 "$26": "250",     # Homing debounce
                 "$27": f"{MACHINE_CONFIG['HOMING_OFFSET'] * 25.4:.3f}",   # Homing pull-off from config (convert inches to mm)
-                "$28": "120.0",   # Homing locate feed rate (match $24)
-                "$29": "40.0",    # Homing search seek rate (match $25)
+                "$28": "0",   # G73 retract distance (mm) - chip breaking drilling
+                "$29": "0",   # Step pulse delay (microseconds, max 20; values <2 rounded up to 2)
                 "$30": "1000.000", # Spindle max rpm
                 "$31": "0.000",   # Spindle min rpm
                 "$32": "0",       # Laser mode enable
@@ -367,9 +367,9 @@ class GrblMotorController:
                 "$102": "100.00000",  # Z steps/inch
                 "$103": "254.00000",  # A steps/inch (calibrated; keep synced with both controller copies)
                 
-                # Maximum rates (inches/min) - Conservative speeds for safety
-                "$110": "2000.000",   # X max rate (reduced for controlled cutting)
-                "$111": "2000.000",   # Y max rate (reduced for controlled cutting)
+                # Maximum rates (mm/min) - must be >= $25 or homing seek rate is silently capped
+                "$110": "3000.000",   # X max rate
+                "$111": "3000.000",   # Y max rate
                 "$112": "1000.000",   # Z max rate (conservative for safety)
                 "$113": "50.000",     # A max rate (VERY conservative to prevent fast spinning)
                 
