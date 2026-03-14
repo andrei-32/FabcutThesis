@@ -365,7 +365,7 @@ class GrblMotorController:
                 # Steps per unit (inches)
                 "$100": "20.32000",   # X steps/inch    
                 "$101": "20.32000",   # Y steps/inch  
-                "$102": "100.00000",  # Z steps/inch
+                "$102": "677.33333",  # Z steps/inch (calibrated from ~1.5 cm actual on 1.0 in command)
                 "$103": "254.00000",  # A steps/inch (calibrated; keep synced with both controller copies)
                 
                 # Maximum rates (mm/min) - must be >= $25 or homing seek rate is silently capped

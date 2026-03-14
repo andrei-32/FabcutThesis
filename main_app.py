@@ -475,7 +475,7 @@ class FabricCNCApp:
         self.jog_size = 1.0  # Default to 1 inch
         self.jog_size_var = ctk.DoubleVar(value=1.0)  # Default to 1 inch
         self._jog_slider_scale = 0.05  # Scale factor for slider (0.05 inch increments)
-        self.z_jog_size = 2.0 / 2.54  # Fixed Z jog per click: 2 cm in inches
+        self.z_jog_size = 0.5  # Fixed Z jog per click: 0.5 inch for safer clearance
         # A-axis calibration shared by jog and toolpath generation.
         # With this setup: 1 jog inch command corresponds to 10 blade degrees.
         self.a_jog_divisor = 71.0
