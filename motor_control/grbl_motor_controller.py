@@ -354,7 +354,7 @@ class GrblMotorController:
                 "$40": "0",       # Limit/control pins pull-up ENABLED (0=enabled, 1=disabled)
                 "$43": "1",       # Homing passes
                 "$44": "7",       # Homing cycle mask (X=1, Y=2, Z=4: 1+2+4=7 home X,Y,Z together)
-                "$45": "11",      # Homing cycle pulloff mask
+                "$45": "7",       # Homing cycle pulloff mask (X/Y/Z only; exclude A)
                 "$46": "0",       # Homing cycle allow manual
                 "$47": "0",       # Homing cycle mpos set
                 "$62": "0",       # Sleep enable
@@ -777,7 +777,7 @@ class GrblMotorController:
         time.sleep(0.5)
         
         # Home axes sequentially using mask + $H for better compatibility.
-        axis_masks = [("X", "1"), ("Y", "2"), ("Z", "4"), ("A", "8")]
+        axis_masks = [("X", "1"), ("Y", "2"), ("Z", "4")]
         for axis_name, axis_mask in axis_masks:
             logger.info(f"Homing {axis_name} axis...")
 
