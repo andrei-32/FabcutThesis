@@ -335,7 +335,7 @@ class GrblMotorController:
                 "$20": "0",       # Soft limits
                 "$21": "0",       # Hard limits disable (prevent A-axis limit issues)
                 "$22": "1",       # Homing cycle enable
-                "$23": "0",       # Homing direction mask (X=0, Y=0, Z=0, A=0 - X&Y home negative, Z&A home negative)
+                "$23": "3",       # Homing direction mask (X=0, Y=0, Z=0, A=0 - X&Y home negative, Z&A home negative)
                 "$24": "200.0",   # Homing feed/locate rate (mm/min) - slow precise approach
                 "$25": "3000.0",  # Homing seek rate (mm/min) - fast initial sweep
                 "$26": "250",     # Homing debounce
@@ -354,7 +354,7 @@ class GrblMotorController:
                 "$40": "0",       # Limit/control pins pull-up ENABLED (0=enabled, 1=disabled)
                 "$43": "1",       # Homing passes
                 "$44": "7",       # Homing cycle mask (X=1, Y=2, Z=4: 1+2+4=7 home X,Y,Z together)
-                "$45": "7",       # Homing cycle pulloff mask (X/Y/Z only; exclude A)
+                "$45": "11",       # Homing cycle pulloff mask (X/Y/Z only; exclude A)
                 "$46": "0",       # Homing cycle allow manual
                 "$47": "0",       # Homing cycle mpos set
                 "$62": "0",       # Sleep enable
