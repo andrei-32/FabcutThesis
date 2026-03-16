@@ -373,9 +373,9 @@ class GrblMotorController:
                 "$113": "50.000",     # A max rate (VERY conservative to prevent fast spinning)
                 
                 # Acceleration (inches/sec²) - Lower values for smoother, safer motion
-                "$120": "100.000",    # X acceleration (reduced for smoother moves)
-                "$121": "100.000",    # Y acceleration (reduced for smoother moves)
-                "$122": "50.000",     # Z acceleration (reduced for safer Z moves)
+                "$120": "200.000",    # X acceleration (reduced for smoother moves)
+                "$121": "200.000",    # Y acceleration (reduced for smoother moves)
+                "$122": "80.000",     # Z acceleration (reduced for safer Z moves)
                 "$123": "5.000",      # A acceleration (VERY conservative for smooth rotation)
                 
                 # Maximum travel (mm for GRBL)
