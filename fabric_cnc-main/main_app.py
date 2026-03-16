@@ -248,10 +248,10 @@ class RealMotorController:
             if abs(actual_delta) > 1e-6:
                 # Use specified jog feedrates for each axis
                 axis_feedrates = {
-                    'X': 300,    # Temporary safer speed for X-axis test
-                    'Y': 300,    # Temporary safer speed for Y-axis test
-                    'Z': 40,     # Slower for NEMA 11 torque margin on Z-axis
-                    'A': 10      # EXTREMELY slow for rotation axis
+                    'X': 360,    # Slightly faster X jog speed
+                    'Y': 360,    # Slightly faster Y jog speed
+                    'Z': 48,     # Slightly faster Z jog speed
+                    'A': 12      # Slightly faster A jog speed
                 }
                 feedrate = axis_feedrates.get(axis, 100)
                 
@@ -413,7 +413,7 @@ class RealMotorController:
                 cmd_parts.append(f"A{rot_distance_deg:.3f}")
             
             if len(cmd_parts) > 2:  # Only send if we have axes to move
-                cmd_parts.append("F1000")  # 1000 mm/min feedrate
+                cmd_parts.append("F1200")  # Slightly faster coordinated feedrate
                 # Ensure we're using work coordinate system
                 self.motor_controller.send("G54")
                 self.motor_controller.send(" ".join(cmd_parts))
