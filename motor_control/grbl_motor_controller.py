@@ -77,7 +77,7 @@ def detect_grbl_controllers():
                 
                 response_str = response.decode('utf-8', errors='ignore')
                 logger.info(f"Response from {device}: {response_str[:100]}...")
-                
+
                 # Check for GRBL-specific responses (case insensitive)
                 grbl_indicators = ['$0=', '$1=', 'grbl', 'ver', '$$', '<idle', '<run', '<hold']
                 if any(indicator in response_str.lower() for indicator in grbl_indicators):
@@ -86,56 +86,56 @@ def detect_grbl_controllers():
                     logger.info(f"✓ GRBL controller detected on {device}")
                 else:
                     logger.info(f"✗ No GRBL response from {device}")
-                    
+
         except serial.SerialException as e:
             logger.warning(f"Serial error testing {device}: {e}")
         except PermissionError:
             logger.warning(f"Permission denied accessing {device} - try running as root or adding user to dialout group")
         except Exception as e:
             logger.warning(f"Could not test {device}: {e}")
-    
+
     return grbl_controllers
 
 def find_best_grbl_port():
     """
     Find the best GRBL controller port to use.
-    
+
     Returns:
         str: Best port device path, or None if no GRBL controller found
     """
     controllers = detect_grbl_controllers()
-    
+
     if not controllers:
         logger.warning("No GRBL controllers detected on ACM ports")
         return None
-    
+
     if len(controllers) == 1:
         port, desc = controllers[0]
         logger.info(f"Using single detected GRBL controller: {desc}")
         return port
-    
+
     # Multiple controllers found - prefer lower numbered ACM ports
     controllers.sort(key=lambda x: x[0])  # Sort by device path
     port, desc = controllers[0]
     logger.info(f"Multiple GRBL controllers found, using first: {desc}")
-    
+
     return port
 
 def get_grbl_controller_status():
     """
     Get status information about detected GRBL controllers.
-    
+
     Returns:
         dict: Status information including detected controllers and current connection
     """
     controllers = detect_grbl_controllers()
-    
+
     status = {
         'detected_controllers': controllers,
         'count': len(controllers),
         'recommended_port': find_best_grbl_port() if controllers else None
     }
-    
+
     return status
 
 class GrblMotorController:
@@ -153,11 +153,11 @@ class GrblMotorController:
                 logger.warning(f"Auto-detection failed, falling back to default port: {self.port}")
         else:
             self.port = port
-            
+
         self.baudrate = baudrate
         self.serial = None
         self.debug_mode = debug_mode
-        
+
         # Try to open the serial connection with cleanup
         self._open_serial_with_cleanup()
         self.command_queue = queue.Queue()
@@ -181,13 +181,13 @@ class GrblMotorController:
         self.reader_thread.start()
         self.writer_thread.start()
         self.poll_thread.start()
-        
+
         # Wait for GRBL to initialize and check/clear alarms FIRST
         time.sleep(2)  # Wait for GRBL to initialize
-        
+
         # Robust alarm clearing sequence at startup
         self._startup_alarm_clear()
-        
+
         # Initialize GRBL settings and reset work coordinates
         self._configure_grbl_settings()
         self.send("G20")  # Set GRBL to inches mode
@@ -202,7 +202,7 @@ class GrblMotorController:
         """Open serial connection with device cleanup and retry logic."""
         max_retries = 3
         retry_delay = 1.0
-        
+
         for attempt in range(max_retries):
             try:
                 self.serial = serial.Serial(self.port, self.baudrate, timeout=1)
@@ -219,16 +219,16 @@ class GrblMotorController:
                 else:
                     logger.error(f"Serial connection error: {e}")
                     raise
-    
+
     def _cleanup_device_processes(self):
         """Kill processes that might be blocking the ACM0 device."""
         try:
             # Find processes using the device
             blocking_pids = []
-            
+
             # Method 1: Use lsof to find processes using the device
             try:
-                result = subprocess.run(['lsof', self.port], 
+                result = subprocess.run(['lsof', self.port],
                                       capture_output=True, text=True, timeout=5)
                 if result.returncode == 0:
                     lines = result.stdout.strip().split('\n')[1:]  # Skip header
@@ -238,7 +238,7 @@ class GrblMotorController:
                             blocking_pids.append(pid)
             except (subprocess.TimeoutExpired, subprocess.CalledProcessError, ValueError):
                 pass
-            
+
             # Method 2: Find Python processes that might be using serial ports
             try:
                 for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
@@ -246,7 +246,7 @@ class GrblMotorController:
                         if proc.info['name'] and 'python' in proc.info['name'].lower():
                             cmdline = ' '.join(proc.info['cmdline'] or [])
                             # Look for serial/GRBL related processes
-                            if any(keyword in cmdline.lower() for keyword in 
+                            if any(keyword in cmdline.lower() for keyword in
                                    ['grbl', 'serial', 'ttyacm', 'arduino', 'cnc']):
                                 if proc.info['pid'] != os.getpid():  # Don't kill ourselves
                                     blocking_pids.append(proc.info['pid'])
@@ -254,39 +254,39 @@ class GrblMotorController:
                         continue
             except Exception as e:
                 logger.warning(f"Error scanning processes: {e}")
-            
+
             # Kill the blocking processes
             for pid in set(blocking_pids):  # Remove duplicates
                 try:
                     process = psutil.Process(pid)
                     process.terminate()
-                    
+
                     # Wait up to 3 seconds for graceful termination
                     try:
                         process.wait(timeout=3)
                     except psutil.TimeoutExpired:
                         process.kill()
-                        
+
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     pass
-            
+
             # Additional cleanup: reset the USB device if possible
             self._reset_usb_device()
-            
+
         except Exception as e:
             logger.error(f"Error during device cleanup: {e}")
-    
+
     def _reset_usb_device(self):
         """Attempt to reset the USB device."""
         try:
             # Find USB device path for ACM0
             usb_path = None
             try:
-                result = subprocess.run(['readlink', '-f', '/sys/class/tty/ttyACM0/device'], 
+                result = subprocess.run(['readlink', '-f', '/sys/class/tty/ttyACM0/device'],
                                       capture_output=True, text=True, timeout=5)
                 if result.returncode == 0:
                     usb_path = result.stdout.strip()
-                    
+
                     # Navigate to USB device reset
                     reset_path = None
                     path_parts = usb_path.split('/')
@@ -294,7 +294,7 @@ class GrblMotorController:
                         if part.startswith('usb'):
                             reset_path = '/'.join(path_parts[:i+2]) + '/authorized'
                             break
-                    
+
                     if reset_path and os.path.exists(reset_path):
                         # Deauthorize and reauthorize the USB device
                         subprocess.run(['sudo', 'sh', '-c', f'echo 0 > {reset_path}'], timeout=2)
@@ -303,7 +303,7 @@ class GrblMotorController:
                         time.sleep(1.0)
             except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
                 pass
-                
+
         except Exception:
             pass
 
@@ -335,9 +335,9 @@ class GrblMotorController:
                 "$20": "0",       # Soft limits
                 "$21": "0",       # Hard limits disable (prevent A-axis limit issues)
                 "$22": "1",       # Homing cycle enable
-                "$23": "3",       # Homing direction mask (X=0, Y=0, Z=0, A=0 - X&Y home negative, Z&A home negative)
-                "$24": "200.0",   # Homing feed/locate rate (mm/min) - slow precise approach
-                "$25": "3000.0",  # Homing seek rate (mm/min) - fast initial sweep
+                "$23": "3",       # Homing direction mask (X/Y home negative, matching physical limit switch placement)
+                "$24": "260.0",   # Homing feed/locate rate (mm/min) - increased for faster final locate phase
+                "$25": "3000.0",  # Homing seek rate (mm/min) - restored to machine's proven high-speed seek value
                 "$26": "250",     # Homing debounce
                 "$27": f"{MACHINE_CONFIG['HOMING_OFFSET'] * 25.4:.3f}",   # Homing pull-off from config (convert inches to mm)
                 "$28": "0",   # G73 retract distance (mm) - chip breaking drilling
@@ -354,7 +354,7 @@ class GrblMotorController:
                 "$40": "0",       # Limit/control pins pull-up ENABLED (0=enabled, 1=disabled)
                 "$43": "1",       # Homing passes
                 "$44": "7",       # Homing cycle mask (X=1, Y=2, Z=4: 1+2+4=7 home X,Y,Z together)
-                "$45": "11",       # Homing cycle pulloff mask (X/Y/Z only; exclude A)
+                "$45": "7",       # Homing cycle pulloff mask (X/Y/Z only; exclude A)
                 "$46": "0",       # Homing cycle allow manual
                 "$47": "0",       # Homing cycle mpos set
                 "$62": "0",       # Sleep enable
@@ -755,7 +755,7 @@ class GrblMotorController:
         self.send(command)
 
     def home_all(self):
-        """Home all axes using $H command."""
+        """Home all axes using sequential mask + $H for each axis."""
         logger.info("Starting home all axes sequence...")
         with self.status_lock:
             self.is_homed = False
@@ -776,35 +776,29 @@ class GrblMotorController:
         self.send("$21=0")
         time.sleep(0.5)
         
-        # Home axes sequentially using mask + $H for better compatibility.
+        # Home axes sequentially for predictable behavior.
         axis_masks = [("X", "1"), ("Y", "2"), ("Z", "4")]
         for axis_name, axis_mask in axis_masks:
             logger.info(f"Homing {axis_name} axis...")
 
             axis_homed = False
             last_error = "unknown"
-            for attempt in range(1, 3):
+            for attempt in range(1, 4):
                 self._drain_ack_queue()
 
-                # Clear alarm/lockout before each homing attempt.
+                # Clear lockout before each attempt.
                 self.send("$X")
                 time.sleep(0.2)
 
-                # Poll for a fresh status report so limit-pin state is current.
+                # Capture current state and any already-active limit pins before starting the axis.
                 self.send_immediate("?")
                 time.sleep(0.2)
                 with self.status_lock:
                     pre_state = self.machine_state
                     pre_pins = getattr(self, 'last_limit_pins', "")
                 logger.info(
-                    f"{axis_name} attempt {attempt}: pre-home status state={pre_state}, "
-                    f"pins={pre_pins or 'none'}"
+                    f"{axis_name} attempt {attempt}: pre-home status state={pre_state}, pins={pre_pins or 'none'}"
                 )
-                if pre_pins:
-                    logger.warning(
-                        f"{axis_name} attempt {attempt}: limit pins ALREADY ACTIVE before motion — "
-                        f"check wiring/polarity ($5) for: {pre_pins}"
-                    )
 
                 self.send(f"$44={axis_mask}")
                 ok, response = self._send_and_wait_response(timeout=3.0)
@@ -814,34 +808,31 @@ class GrblMotorController:
                     continue
 
                 self.send("$H")
-                # Some axes can legitimately take longer than 25s depending on distance and seek rate.
                 ok, response = self._send_and_wait_response(timeout=120.0)
-                if ok:
-                    done_ok, done_info = self._wait_for_homing_motion_complete(timeout=120.0)
-                    if done_ok:
-                        # Drain late acknowledgments before the next axis to avoid cross-axis response bleed.
-                        self._drain_ack_queue()
-                        axis_homed = True
-                        logger.info(f"{axis_name} homing complete. {done_info}")
-                        break
-                    last_error = done_info
-                    logger.warning(f"{axis_name} attempt {attempt} did not complete: {done_info}")
+                if not ok:
+                    last_error = response
+                    logger.warning(f"{axis_name} attempt {attempt} failed: {response}")
+                    if response in ("error:9", "error:79"):
+                        self.send("$X")
+                        time.sleep(0.3)
                     continue
 
-                last_error = response
-                logger.warning(f"{axis_name} attempt {attempt} failed: {response}")
-                if response in ("error:9", "error:79"):
-                    self.send("$X")
-                    time.sleep(0.3)
+                done_ok, done_info = self._wait_for_homing_motion_complete(timeout=120.0)
+                if done_ok:
+                    axis_homed = True
+                    logger.info(f"{axis_name} homing complete. {done_info}")
+                    break
+
+                last_error = done_info
+                logger.warning(f"{axis_name} attempt {attempt} did not complete: {done_info}")
 
             if not axis_homed:
                 raise RuntimeError(f"{axis_name} homing failed after retries: {last_error}")
 
-        # Restore profile default mask after sequential homing.
-        restore_mask = getattr(self, 'default_homing_cycle_mask', '7')
-        self.send(f"$44={restore_mask}")
+        # Restore default XYZ mask after sequential cycle.
+        self.send("$44=7")
         self._send_and_wait_response(timeout=3.0)
-        logger.info(f"All axes homed sequentially; restored $44={restore_mask}")
+        logger.info("Sequential homing complete for X, Y, Z")
         
         # Wait for machine to stabilize and get final MACHINE position
         logger.info("Waiting for machine to stabilize after homing...")
