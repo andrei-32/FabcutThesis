@@ -314,11 +314,11 @@ class GrblMotorController:
             settings = {
                 # Basic settings
                 "$0": "5.0",      # Step pulse time
-                    "$13": "1",       # Report in inches to match UI position handling
+                "$13": "1",       # Report in inches to match UI position handling
                 "$2": "0",        # Step pulse invert
                 "$3": "9",        # Step direction invert (X=1, A=8, total=9; Y inverted OFF)
                 "$4": "15",       # Step enable invert
-                "$5": "0",        # Limit pins invert (0=no invert, try if switches are normally-open)
+                "$5": "1",        # Limit pins invert (0=no invert, try if switches are normally-open)
                 "$6": "0",        # Probe pin invert
                 "$9": "1",        # PWM spindle mode
                 "$10": "2",       # Status report options: WPos only (1=MPos, 2=WPos, 3=both)
@@ -352,7 +352,7 @@ class GrblMotorController:
                 "$40": "0",       # Limit/control pins pull-up ENABLED (0=enabled, 1=disabled)
                 "$43": "1",       # Homing passes
                 "$44": "7",       # Homing cycle mask (X=1, Y=2, Z=4: 1+2+4=7 home X,Y,Z together)
-                "$45": "11",      # Homing cycle pulloff mask
+                "$45": "7",       # Homing cycle pulloff mask (X/Y/Z only; exclude A)
                 "$46": "0",       # Homing cycle allow manual
                 "$47": "0",       # Homing cycle mpos set
                 "$62": "0",       # Sleep enable
@@ -780,6 +780,16 @@ class GrblMotorController:
                 # Clear lockout before each attempt.
                 self.send("$X")
                 time.sleep(0.2)
+
+                # Capture current state and any already-active limit pins before starting the axis.
+                self.send_immediate("?")
+                time.sleep(0.2)
+                with self.status_lock:
+                    pre_state = self.machine_state
+                    pre_pins = getattr(self, 'last_limit_pins', "")
+                logger.info(
+                    f"{axis_name} attempt {attempt}: pre-home status state={pre_state}, pins={pre_pins or 'none'}"
+                )
 
                 self.send(f"$44={axis_mask}")
                 ok, response = self._send_and_wait_response(timeout=3.0)

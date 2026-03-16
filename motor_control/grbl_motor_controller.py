@@ -790,19 +790,28 @@ class GrblMotorController:
                 self.send("$X")
                 time.sleep(0.2)
 
+                # Poll for a fresh status report so limit-pin state is current.
+                self.send_immediate("?")
+                time.sleep(0.2)
+                with self.status_lock:
+                    pre_state = self.machine_state
+                    pre_pins = getattr(self, 'last_limit_pins', "")
+                logger.info(
+                    f"{axis_name} attempt {attempt}: pre-home status state={pre_state}, "
+                    f"pins={pre_pins or 'none'}"
+                )
+                if pre_pins:
+                    logger.warning(
+                        f"{axis_name} attempt {attempt}: limit pins ALREADY ACTIVE before motion — "
+                        f"check wiring/polarity ($5) for: {pre_pins}"
+                    )
+
                 self.send(f"$44={axis_mask}")
                 ok, response = self._send_and_wait_response(timeout=3.0)
                 if not ok:
                     last_error = f"set mask failed: {response}"
                     logger.warning(f"{axis_name} attempt {attempt}: {last_error}")
                     continue
-
-                with self.status_lock:
-                    pre_state = self.machine_state
-                    pre_pins = getattr(self, 'last_limit_pins', "")
-                logger.info(
-                    f"{axis_name} attempt {attempt}: set $44={axis_mask}, pre-home state={pre_state}, pins={pre_pins}"
-                )
 
                 self.send("$H")
                 # Some axes can legitimately take longer than 25s depending on distance and seek rate.
