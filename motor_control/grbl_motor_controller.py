@@ -173,6 +173,7 @@ class GrblMotorController:
         self.is_homed = False  # Track if machine is homed
         self.machine_state = "Unknown"  # Track GRBL state (Idle, Run, Hold, Alarm, etc.)
         self.default_homing_cycle_mask = "7"  # Updated from configured $44 during GRBL setup
+        self.default_homing_direction_mask = "3"  # Updated from configured $23 during GRBL setup
 
         self.reader_thread = threading.Thread(target=self._read_loop, daemon=True)
         self.writer_thread = threading.Thread(target=self._write_loop, daemon=True)
@@ -336,8 +337,8 @@ class GrblMotorController:
                 "$21": "0",       # Hard limits disable (prevent A-axis limit issues)
                 "$22": "1",       # Homing cycle enable
                 "$23": "3",       # Homing direction mask (X=1, Y=1, Z=0, A=0 - X&Y home positive, Z&A home negative)
-                "$24": "200.0",   # Homing feed/locate rate (mm/min) - slow precise approach
-                "$25": "3000.0",  # Homing seek rate (mm/min) - fast initial sweep
+                "$24": "120.0",   # Homing feed/locate rate (mm/min) - slower for reliable switch trip
+                "$25": "400.0",   # Homing seek rate (mm/min) - reduced to avoid overshoot/missed switches
                 "$26": "250",     # Homing debounce
                 "$27": f"{MACHINE_CONFIG['HOMING_OFFSET'] * 25.4:.3f}",   # Homing pull-off from config (convert inches to mm)
                 "$28": "0",   # G73 retract distance (mm) - chip breaking drilling
@@ -411,6 +412,7 @@ class GrblMotorController:
 
             # Keep track of the profile default homing mask so sequential homing can restore it.
             self.default_homing_cycle_mask = settings.get("$44", "7")
+            self.default_homing_direction_mask = settings.get("$23", "3")
             
             # Log the homing offset being used
             homing_offset = MACHINE_CONFIG['HOMING_OFFSET']
@@ -703,6 +705,20 @@ class GrblMotorController:
         except queue.Empty:
             pass
 
+    def _toggle_axis_bit_in_mask(self, mask, axis_name):
+        """Toggle one axis bit in a GRBL direction mask string and return it as string."""
+        axis_bits = {"X": 1, "Y": 2, "Z": 4, "A": 8}
+        bit = axis_bits.get(axis_name)
+        if bit is None:
+            return str(mask)
+
+        try:
+            mask_int = int(mask)
+        except (TypeError, ValueError):
+            mask_int = int(getattr(self, "default_homing_direction_mask", "3"))
+
+        return str(mask_int ^ bit)
+
     def _wait_for_homing_motion_complete(self, timeout=30.0):
         """Wait until homing motion has started and returned to Idle."""
         start_time = time.time()
@@ -783,12 +799,20 @@ class GrblMotorController:
 
             axis_homed = False
             last_error = "unknown"
+            axis_direction_mask = str(getattr(self, "default_homing_direction_mask", "3"))
             for attempt in range(1, 3):
                 self._drain_ack_queue()
 
                 # Clear alarm/lockout before each homing attempt.
                 self.send("$X")
                 time.sleep(0.2)
+
+                self.send(f"$23={axis_direction_mask}")
+                ok, response = self._send_and_wait_response(timeout=3.0)
+                if not ok:
+                    last_error = f"set direction failed: {response}"
+                    logger.warning(f"{axis_name} attempt {attempt}: {last_error}")
+                    continue
 
                 self.send(f"$44={axis_mask}")
                 ok, response = self._send_and_wait_response(timeout=3.0)
@@ -824,6 +848,12 @@ class GrblMotorController:
                 if response in ("error:9", "error:79"):
                     self.send("$X")
                     time.sleep(0.3)
+                elif response == "error:5":
+                    # error:5 means switch wasn't found in the search direction.
+                    axis_direction_mask = self._toggle_axis_bit_in_mask(axis_direction_mask, axis_name)
+                    logger.warning(
+                        f"{axis_name} axis switch not found; retrying with flipped homing direction ($23={axis_direction_mask})"
+                    )
 
             if not axis_homed:
                 raise RuntimeError(f"{axis_name} homing failed after retries: {last_error}")
@@ -831,6 +861,9 @@ class GrblMotorController:
         # Restore profile default mask after sequential homing.
         restore_mask = getattr(self, 'default_homing_cycle_mask', '7')
         self.send(f"$44={restore_mask}")
+        self._send_and_wait_response(timeout=3.0)
+        restore_direction_mask = getattr(self, 'default_homing_direction_mask', '3')
+        self.send(f"$23={restore_direction_mask}")
         self._send_and_wait_response(timeout=3.0)
         logger.info(f"All axes homed sequentially; restored $44={restore_mask}")
         
