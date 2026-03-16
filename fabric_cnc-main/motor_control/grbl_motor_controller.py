@@ -318,7 +318,7 @@ class GrblMotorController:
                 "$2": "0",        # Step pulse invert
                 "$3": "9",        # Step direction invert (X=1, A=8, total=9; Y inverted OFF)
                 "$4": "15",       # Step enable invert
-                "$5": "1",        # Limit pins invert (0=no invert, try if switches are normally-open)
+                "$5": "0",        # Limit pins invert (0=no invert, try if switches are normally-open)
                 "$6": "0",        # Probe pin invert
                 "$9": "1",        # PWM spindle mode
                 "$10": "2",       # Status report options: WPos only (1=MPos, 2=WPos, 3=both)
