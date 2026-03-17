@@ -478,7 +478,7 @@ class FabricCNCApp:
         self.a_degrees_per_grbl_unit = self.a_jog_divisor * self.a_jog_degrees_per_inch
         
         # Z lower limit control
-        self.z_lower_limit = -2.0  # Runtime adjustable Z lower limit
+        self.z_lower_limit = -1.0  # Runtime adjustable Z lower limit
         self.z_lower_limit_var = ctk.DoubleVar(value=-2.0)
         self._arrow_key_state = {}
         self._arrow_key_after_ids = {}
