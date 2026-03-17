@@ -341,7 +341,7 @@ class GrblMotorController:
                 "$24": "120.0",   # Homing feed/locate rate (mm/min) - increased for faster final locate phase
                 "$25": "2000",  # Homing seek rate (mm/min) - restored to machine's proven high-speed seek value
                 "$26": "250",     # Homing debounce
-                "$27": f"{MACHINE_CONFIG['HOMING_OFFSET'] * 25.4:.3f}",   # Homing pull-off from config (convert inches to mm)
+                "$27": "0.000",   # Homing pull-off disabled
                 "$28": "0",   # G73 retract distance (mm) - chip breaking drilling
                 "$29": "0",   # Step pulse delay (microseconds, max 20; values <2 rounded up to 2)
                 "$30": "1000.000", # Spindle max rpm
@@ -413,10 +413,6 @@ class GrblMotorController:
 
             # Keep track of the profile default homing mask so sequential homing can restore it.
             self.default_homing_cycle_mask = settings.get("$44", "7")
-            
-            # Log the homing offset being used
-            homing_offset = MACHINE_CONFIG['HOMING_OFFSET']
-            logger.info(f"Configuring GRBL with homing offset: {homing_offset:.3f} inches ({homing_offset*25.4:.1f}mm)")
             
             # Send all settings with small delays
             for setting, value in settings.items():

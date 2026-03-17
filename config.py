@@ -220,7 +220,7 @@ MOTOR_CONFIG = {
 MACHINE_CONFIG = {
     'MAX_X': 30,  # Maximum X travel in inches (matches work area)
     'MAX_Y': 30,  # Maximum Y travel in inches (matches work area)
-    'HOMING_OFFSET': 0.225,  # Distance to move after hitting home sensor (5.715mm = 0.225 inches)
+    'HOMING_OFFSET': 0,  # No homing pull-off
     'VERIFICATION_DISTANCE': 0.394  # Distance to move for verification (10mm = 0.394 inches)
 }
 

@@ -339,7 +339,7 @@ class GrblMotorController:
                 "$24": "200.0",   # Homing feed/locate rate (mm/min) - slow precise approach
                 "$25": "3000.0",  # Homing seek rate (mm/min) - fast initial sweep
                 "$26": "250",     # Homing debounce
-                "$27": f"{MACHINE_CONFIG['HOMING_OFFSET'] * 25.4:.3f}",   # Homing pull-off from config (convert inches to mm)
+                "$27": "0.000",   # Homing pull-off disabled
                 "$28": "0",   # G73 retract distance (mm) - chip breaking drilling
                 "$29": "0",   # Step pulse delay (microseconds, max 20; values <2 rounded up to 2)
                 "$30": "1000.000", # Spindle max rpm
@@ -408,10 +408,6 @@ class GrblMotorController:
                 "$676": "3",       # WiFi mode
                 "$680": "0"        # Modbus enable
             }
-            
-            # Log the homing offset being used
-            homing_offset = MACHINE_CONFIG['HOMING_OFFSET']
-            logger.info(f"Configuring GRBL with homing offset: {homing_offset:.3f} inches ({homing_offset*25.4:.1f}mm)")
             
             # Send all settings with small delays
             for setting, value in settings.items():
