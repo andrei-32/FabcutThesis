@@ -172,9 +172,6 @@ class GrblMotorController:
         self.response_callback = None  # Callback for manual command responses
         self.is_homed = False  # Track if machine is homed
         self.machine_state = "Unknown"  # Track GRBL state (Idle, Run, Hold, Alarm, etc.)
-        self.last_grbl_error = ""  # Last async error/alarm line from GRBL
-        self.last_grbl_error_time = 0.0
-        self.allow_auto_unlock = False  # Enable after startup configuration completes
         self.default_homing_cycle_mask = "7"  # Updated from configured $44 during GRBL setup
 
         self.reader_thread = threading.Thread(target=self._read_loop, daemon=True)
@@ -197,7 +194,6 @@ class GrblMotorController:
         self.send("G90")  # Set absolute positioning
         self.send("G10 P1 L20 X0 Y0 Z0 A0")  # Reset work coordinates to 0,0,0,0
         self.send("G54")  # Select work coordinate system 1
-        self.allow_auto_unlock = True
         # Reset position tracking
         with self.status_lock:
             self.position = [0.0, 0.0, 0.0, 0.0]
@@ -326,7 +322,7 @@ class GrblMotorController:
                 "$2": "0",        # Step pulse invert
                 "$3": "12",       # Step direction invert (Z=4 + A=8; Y inverted OFF)
                 "$4": "15",       # Step enable invert
-                "$5": "0",        # Limit pins invert (0=no invert, try if switches are normally-open)
+                "$5": "1",        # Limit pins invert (0=no invert, try if switches are normally-open)
                 "$6": "0",        # Probe pin invert
                 "$9": "1",        # PWM spindle mode
                 "$10": "2",       # Status report options: WPos only (1=MPos, 2=WPos, 3=both)
@@ -339,9 +335,9 @@ class GrblMotorController:
                 "$18": "0",       # Tool change mode
                 "$19": "0",       # Laser mode
                 "$20": "0",       # Soft limits
-                "$21": "1",       # Hard limits enable (protects against over-travel)
+                "$21": "0",       # Hard limits disable (prevent A-axis limit issues)
                 "$22": "1",       # Homing cycle enable
-                "$23": "4",       # Homing direction mask: X-, Y-, Z+, A- (X and Y home negative)
+                "$23": "5",       # Homing direction mask: X+, Y-, Z+, A- (only Y homes negative)
                 "$24": "260.0",   # Homing feed/locate rate (mm/min) - increased for faster final locate phase
                 "$25": "3000.0",  # Homing seek rate (mm/min) - restored to machine's proven high-speed seek value
                 "$26": "250",     # Homing debounce
@@ -520,11 +516,6 @@ class GrblMotorController:
                             # Put acknowledgments in queue for G-code streaming
                             if decoded == "ok" or decoded.startswith("error:") or decoded.startswith("ALARM:"):
                                 self.ack_queue.put(decoded)
-
-                            if decoded.startswith("error:") or decoded.startswith("ALARM:"):
-                                with self.status_lock:
-                                    self.last_grbl_error = decoded
-                                    self.last_grbl_error_time = time.time()
                             
                             if self.debug_mode:
                                 print(f"[GRBL RESP] {decoded}")
@@ -537,15 +528,20 @@ class GrblMotorController:
                                     if self.response_callback:
                                         self.response_callback(f"ERROR: {decoded} - {error_msg}")
                                     
-                                    # Auto-clear only lockout errors after startup completes.
-                                    # Do not auto-recover error:79 here: it can create an unlock/reset loop
-                                    # while homing is not yet enabled or a limit is active.
-                                    if decoded == "error:9" and self.allow_auto_unlock:
+                                    # Auto-clear alarm if error:9 (alarm state) or error:79 (unlock failed)
+                                    if decoded == "error:9" or decoded == "error:79":
                                         current_time = time.time()
+                                        # Only try to clear alarm once every 5 seconds to avoid spam
                                         if current_time - self.last_error_time > 5.0:
                                             self.last_error_time = current_time
-                                            logger.info("Auto-clearing alarm state (error:9)...")
-                                            self.send("$X")
+                                            if decoded == "error:9":
+                                                logger.info("Auto-clearing alarm state (error:9)...")
+                                                self.send("$X")  # Send unlock command
+                                            elif decoded == "error:79":
+                                                logger.info("Unlock failed (error:79) - trying reset + unlock...")
+                                                self.send_immediate("\x18")  # Soft reset
+                                                time.sleep(1)
+                                                self.send("$X")  # Try unlock after reset
                                 else:
                                     # Avoid terminal spam from routine controller chatter.
                                     if decoded.strip():
@@ -709,22 +705,6 @@ class GrblMotorController:
         except queue.Empty:
             pass
 
-    def _clear_last_grbl_error(self):
-        """Clear tracked async GRBL error/alarm line."""
-        with self.status_lock:
-            self.last_grbl_error = ""
-            self.last_grbl_error_time = 0.0
-
-    def _get_recent_grbl_error(self, max_age_seconds=1.0):
-        """Return a recently seen async error/alarm line, or empty string."""
-        with self.status_lock:
-            err = self.last_grbl_error
-            ts = self.last_grbl_error_time
-
-        if err and (time.time() - ts) <= max_age_seconds:
-            return err
-        return ""
-
     def _wait_for_homing_motion_complete(self, timeout=30.0):
         """Wait until homing motion has started and returned to Idle."""
         start_time = time.time()
@@ -733,10 +713,6 @@ class GrblMotorController:
         pins = ""
 
         while time.time() - start_time < timeout:
-            recent_error = self._get_recent_grbl_error(max_age_seconds=2.0)
-            if recent_error:
-                return False, f"async {recent_error}"
-
             self.send_immediate("?")
             time.sleep(0.15)
 
@@ -806,46 +782,21 @@ class GrblMotorController:
         self.send("$21=0")
         time.sleep(0.5)
         
-        # Home axes sequentially with explicit per-axis commands.
-        # Z homes first to lift the cutting head before X/Y travel.
-        # Tuple: (axis_name, $44_mask, $23_dir_bit, max_travel_setting, max_travel_mm)
-        axis_defs = [("Z", "4", 2, "$132", "127.000"),
-                     ("X", "1", 0, "$130", "1727.000"),
-                     ("Y", "2", 1, "$131", "1143.000")]
-        failed_axes = []
-
-        # Track current $23 value so we can flip per-axis direction bits if needed.
-        current_dir_mask = 4  # matches startup setting $23=4
-
-        for axis_name, axis_mask, dir_bit, travel_setting, travel_value in axis_defs:
+        # Home axes sequentially for predictable behavior.
+        axis_masks = [("X", "1"), ("Y", "2"), ("Z", "4")]
+        for axis_name, axis_mask in axis_masks:
             logger.info(f"Homing {axis_name} axis...")
-
-            # Re-apply this axis's max travel to ensure EEPROM isn't holding a stale small value.
-            self.send(f"{travel_setting}={travel_value}")
-            time.sleep(0.2)
 
             axis_homed = False
             last_error = "unknown"
-            tried_dir_flip = False
-            seek_fail_count = 0  # count ALARM:8 / error:5 to trigger direction flip
-
-            for attempt in range(1, 5):  # up to 4 attempts: 3 normal + 1 direction-flipped
+            for attempt in range(1, 4):
                 self._drain_ack_queue()
-                self._clear_last_grbl_error()
-
-                # If all prior attempts were seek-distance / switch-not-found failures,
-                # flip the $23 direction bit for this axis on attempt 4.
-                if attempt == 4 and not tried_dir_flip and seek_fail_count >= 3:
-                    current_dir_mask ^= (1 << dir_bit)
-                    self.send(f"$23={current_dir_mask}")
-                    time.sleep(0.2)
-                    logger.info(f"{axis_name}: all seeks failed — trying opposite direction ($23={current_dir_mask})")
-                    tried_dir_flip = True
 
                 # Clear lockout before each attempt.
                 self.send("$X")
                 time.sleep(0.2)
 
+                # Capture current state and any already-active limit pins before starting the axis.
                 self.send_immediate("?")
                 time.sleep(0.2)
                 with self.status_lock:
@@ -862,28 +813,14 @@ class GrblMotorController:
                     logger.warning(f"{axis_name} attempt {attempt}: {last_error}")
                     continue
 
-                # Firmware only supports plain $H; single-axis targeting is done via $44 mask above.
                 self.send("$H")
                 ok, response = self._send_and_wait_response(timeout=120.0)
                 if not ok:
                     last_error = response
                     logger.warning(f"{axis_name} attempt {attempt} failed: {response}")
-                    if response in ("error:5", "error:9", "error:79"):
-                        seek_fail_count += 1
+                    if response in ("error:9", "error:79"):
                         self.send("$X")
                         time.sleep(0.3)
-                    continue
-
-                # Catch async homing failures that arrive right after an initial "ok".
-                time.sleep(0.2)
-                recent_error = self._get_recent_grbl_error(max_age_seconds=2.0)
-                if recent_error:
-                    last_error = recent_error
-                    logger.warning(f"{axis_name} attempt {attempt} failed: async {recent_error}")
-                    if "ALARM:8" in recent_error or "error:5" in recent_error:
-                        seek_fail_count += 1
-                    self.send("$X")
-                    time.sleep(0.3)
                     continue
 
                 done_ok, done_info = self._wait_for_homing_motion_complete(timeout=120.0)
@@ -896,29 +833,12 @@ class GrblMotorController:
                 logger.warning(f"{axis_name} attempt {attempt} did not complete: {done_info}")
 
             if not axis_homed:
-                if "error:5" in last_error:
-                    logger.error(
-                        f"{axis_name} homing failed (error:5) — limit switch never triggered.\n"
-                        f"  Physical checks:\n"
-                        f"  1. Is the {axis_name} limit switch wired to the correct GRBL input pin?\n"
-                        f"  2. Does the switch LED light when the axis is near home?\n"
-                        f"  3. Run '?' in a serial terminal near the switch — check for '{axis_name}' in Pn: field.\n"
-                        f"  4. Try toggling $5 (limit pin invert) if switch is PNP/NPN mismatch."
-                    )
-                else:
-                    logger.error(f"{axis_name} homing failed after retries: {last_error}")
-                failed_axes.append(axis_name)
-                # Clear alarm and continue so remaining axes can still home.
-                self.send("$X")
-                time.sleep(0.3)
+                raise RuntimeError(f"{axis_name} homing failed after retries: {last_error}")
 
         # Restore default XYZ mask after sequential cycle.
         self.send("$44=7")
         self._send_and_wait_response(timeout=3.0)
-        if failed_axes:
-            logger.warning(f"Homing completed with failures on: {', '.join(failed_axes)}. Successfully homed: {', '.join(a for a, _ in [('Z','4'),('X','1'),('Y','2')] if a not in failed_axes)}")
-        else:
-            logger.info("Sequential homing complete for Z, X, Y")
+        logger.info("Sequential homing complete for X, Y, Z")
         
         # Wait for machine to stabilize and get final MACHINE position
         logger.info("Waiting for machine to stabilize after homing...")
@@ -960,10 +880,8 @@ class GrblMotorController:
         
         logger.info(f"Home all completed - work offset set to {self.work_offset}")
         
-        # Re-enable hard limits now that homing is complete.
-        logger.info("Re-enabling hard limits after homing ($21=1)...")
-        self.send("$21=1")
-        time.sleep(0.2)
+        # Keep hard limits disabled after homing (current machine profile).
+        logger.info("Hard limits remain disabled after homing ($21=0).")
         
         # Set GRBL work coordinate system to origin at current position
         # This tells GRBL that the current (homed) position should be (0,0,0,0) in work coordinates
@@ -978,11 +896,9 @@ class GrblMotorController:
         self.send("?")
         time.sleep(0.5)
         
-        # Only mark fully homed if every axis succeeded.
+        # Mark as homed after successful homing
         with self.status_lock:
-            self.is_homed = len(failed_axes) == 0
-        if failed_axes:
-            raise RuntimeError(f"Homing incomplete - failed axes: {', '.join(failed_axes)}")
+            self.is_homed = True
     
     def is_machine_homed(self) -> bool:
         """Check if the machine is currently homed."""
@@ -1115,7 +1031,13 @@ class GrblMotorController:
     def _startup_alarm_clear(self):
         """Robust alarm clearing sequence for startup."""
         try:
-            # Use a single soft reset at startup; defer unlock until homing/config stage.
+            # Comprehensive alarm clearing sequence
+            
+            # Method 1: Try simple unlock first
+            self.send("$X")
+            time.sleep(2)
+            
+            # Method 2: If still in alarm, try soft reset + unlock
             self.send_immediate("\x18")  # Ctrl-X soft reset
             time.sleep(3)  # Wait for reset
             
@@ -1129,9 +1051,19 @@ class GrblMotorController:
                         pass
                 time.sleep(0.1)
             
-            # Query status once so machine_state is populated early.
-            self.send_immediate("?")
-            time.sleep(0.3)
+            # Send unlock after reset
+            self.send("$X")
+            time.sleep(1)
+            
+            # Method 3: Try unlock (hard limits already disabled at startup)
+            self.send("$X")     # Try unlock
+            time.sleep(1)
+            
+            # Method 4: Final attempt with position reset
+            self.send("G10 P1 L20 X0 Y0 Z0 A0")  # Reset work coordinates
+            time.sleep(0.5)
+            self.send("$X")  # Final unlock attempt
+            time.sleep(1)
             
         except Exception as e:
             logger.error(f"Failed during startup alarm clearing: {e}")
