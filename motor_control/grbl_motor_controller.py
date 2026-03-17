@@ -339,7 +339,7 @@ class GrblMotorController:
                 "$20": "0",       # Soft limits
                 "$21": "0",       # Hard limits disable (prevent A-axis limit issues)
                 "$22": "1",       # Homing cycle enable
-                "$23": "5",       # Homing direction mask: X+, Y-, Z+, A- (only Y homes negative)
+                "$23": "4",       # Homing direction mask: X-, Y-, Z+, A- (X and Y home negative)
                 "$24": "260.0",   # Homing feed/locate rate (mm/min) - increased for faster final locate phase
                 "$25": "3000.0",  # Homing seek rate (mm/min) - restored to machine's proven high-speed seek value
                 "$26": "250",     # Homing debounce
