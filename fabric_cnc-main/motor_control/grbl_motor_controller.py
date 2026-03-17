@@ -367,16 +367,16 @@ class GrblMotorController:
                 "$103": "254.00000",  # A steps/inch (calibrated; keep synced with both controller copies)
                 
                 # Maximum rates (mm/min) - modest increase for quicker motion while keeping stability margin
-                "$110": "5000.000",   # X max rate
-                "$111": "5000.000",   # Y max rate
+                "$110": "6000.000",   # X max rate
+                "$111": "6000.000",   # Y max rate
                 "$112": "1200.000",   # Z max rate (still conservative for safety)
                 "$113": "60.000",     # A max rate (still conservative to prevent fast spinning)
                 
                 # Acceleration (inches/sec²) - modest increase to match higher axis rates
-                "$120": "400.000",    # X acceleration
-                "$121": "400.000",    # Y acceleration
+                "$120": "700.000",    # X acceleration
+                "$121": "700.000",    # Y acceleration
                 "$122": "96.000",     # Z acceleration
-                "$123": "6.000",      # A acceleration
+                "$123": "10.000",      # A acceleration
                 
                 # Maximum travel (mm for GRBL)
                 "$130": "1727.000",   # X max travel
