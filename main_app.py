@@ -239,10 +239,19 @@ class RealMotorController:
             actual_delta = clamped_val - current_val
 
             if abs(actual_delta) > 1e-6:
+                # Use specified jog feedrates for each axis
+                axis_feedrates = {
+                    'X': 3000,   # High speed for X-axis
+                    'Y': 3000,   # High speed for Y-axis
+                    'Z': 500,    # Medium speed for Z-axis
+                    'A': 10      # EXTREMELY slow for rotation axis
+                }
+                feedrate = axis_feedrates.get(axis, 100)
+                
                 # Send delta directly to GRBL for all axes
                 delta_grbl = actual_delta
                 
-                self.motor_controller.jog(axis, delta_grbl)
+                self.motor_controller.jog(axis, delta_grbl, feedrate)
                 time.sleep(0.2)  # Wait for GRBL to process
                 
                 # Update work coordinates to match machine position after jogging

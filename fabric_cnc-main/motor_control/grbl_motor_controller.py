@@ -10,7 +10,7 @@ import psutil
 import logging
 import glob
 import serial.tools.list_ports
-from config import MACHINE_CONFIG, GRBL_SPEED_CONFIG
+from config import MACHINE_CONFIG
 
 logger = logging.getLogger(__name__)
 
@@ -309,18 +309,16 @@ class GrblMotorController:
         """Configure comprehensive GRBL settings for proper operation.""" 
         try:
             # Configure GRBL settings
-            max_rate = GRBL_SPEED_CONFIG.get('MAX_RATE_MM_MIN', {})
-            accel = GRBL_SPEED_CONFIG.get('ACCEL_MM_SEC2', {})
             
             # Define all required settings
             settings = {
                 # Basic settings
                 "$0": "5.0",      # Step pulse time
-                "$13": "1",       # Report in inches to match UI position handling
+                    "$13": "1",       # Report in inches to match UI position handling
                 "$2": "0",        # Step pulse invert
                 "$3": "9",        # Step direction invert (X=1, A=8, total=9; Y inverted OFF)
                 "$4": "15",       # Step enable invert
-                "$5": "1",        # Limit pins invert (0=no invert, try if switches are normally-open)
+                "$5": "0",        # Limit pins invert (0=no invert, try if switches are normally-open)
                 "$6": "0",        # Probe pin invert
                 "$9": "1",        # PWM spindle mode
                 "$10": "2",       # Status report options: WPos only (1=MPos, 2=WPos, 3=both)
@@ -335,7 +333,7 @@ class GrblMotorController:
                 "$20": "0",       # Soft limits
                 "$21": "0",       # Hard limits disable (prevent A-axis limit issues)
                 "$22": "1",       # Homing cycle enable
-                "$23": "0",       # Homing direction mask (X=0, Y=0, Z=0, A=0 - X&Y home negative, Z&A home negative)
+                "$23": "3",       # Homing direction mask (X=1, Y=1, Z=0, A=0 - X&Y home positive, Z&A home negative)
                 "$24": "200.0",   # Homing feed/locate rate (mm/min) - slow precise approach
                 "$25": "3000.0",  # Homing seek rate (mm/min) - fast initial sweep
                 "$26": "250",     # Homing debounce
@@ -354,7 +352,7 @@ class GrblMotorController:
                 "$40": "0",       # Limit/control pins pull-up ENABLED (0=enabled, 1=disabled)
                 "$43": "1",       # Homing passes
                 "$44": "7",       # Homing cycle mask (X=1, Y=2, Z=4: 1+2+4=7 home X,Y,Z together)
-                "$45": "7",       # Homing cycle pulloff mask (X/Y/Z only; exclude A)
+                "$45": "11",      # Homing cycle pulloff mask
                 "$46": "0",       # Homing cycle allow manual
                 "$47": "0",       # Homing cycle mpos set
                 "$62": "0",       # Sleep enable
@@ -366,19 +364,19 @@ class GrblMotorController:
                 "$100": "20.32000",   # X steps/inch
                 "$101": "20.32000",   # Y steps/inch  
                 "$102": "677.33333",  # Z steps/inch (calibrated from ~1.5 cm actual on 1.0 in command)
-                "$103": "150.00000",  # A steps/inch (calibrated; keep synced with both controller copies)
+                "$103": "254.00000",  # A steps/inch (calibrated; keep synced with both controller copies)
                 
-                # Maximum rates (mm/min)
-                "$110": f"{max_rate.get('X', 5000.0):.3f}",   # X max rate
-                "$111": f"{max_rate.get('Y', 5000.0):.3f}",   # Y max rate
-                "$112": f"{max_rate.get('Z', 1200.0):.3f}",   # Z max rate
-                "$113": f"{max_rate.get('A', 60.0):.3f}",     # A max rate
+                # Maximum rates (mm/min) - must be >= $25 or homing seek rate is silently capped
+                "$110": "3000.000",   # X max rate
+                "$111": "3000.000",   # Y max rate
+                "$112": "1000.000",   # Z max rate (conservative for safety)
+                "$113": "50.000",     # A max rate (VERY conservative to prevent fast spinning)
                 
-                # Acceleration (mm/sec^2)
-                "$120": f"{accel.get('X', 400.0):.3f}",    # X acceleration
-                "$121": f"{accel.get('Y', 400.0):.3f}",    # Y acceleration
-                "$122": f"{accel.get('Z', 96.0):.3f}",     # Z acceleration
-                "$123": f"{accel.get('A', 10.0):.3f}",      # A acceleration
+                # Acceleration (inches/sec²) - Lower values for smoother, safer motion
+                "$120": "100.000",    # X acceleration (reduced for smoother moves)
+                "$121": "100.000",    # Y acceleration (reduced for smoother moves)
+                "$122": "50.000",     # Z acceleration (reduced for safer Z moves)
+                "$123": "5.000",      # A acceleration (VERY conservative for smooth rotation)
                 
                 # Maximum travel (mm for GRBL)
                 "$130": "1727.000",   # X max travel
@@ -737,13 +735,9 @@ class GrblMotorController:
 
         return False, f"timeout waiting homing completion, state={state}, pins={pins}"
 
-    def jog(self, axis, delta, feedrate=None):
+    def jog(self, axis, delta, feedrate=100):
         if axis not in "XYZA":
             raise ValueError("Invalid axis")
-
-        if feedrate is None:
-            jog_defaults = GRBL_SPEED_CONFIG.get('JOG_FEEDRATE_IPM', {})
-            feedrate = jog_defaults.get(axis, 100)
         
         # Use G91 for relative movement, let GRBL use current unit mode
         command = f"$J=G91 {axis}{delta:.5f} F{feedrate}"
@@ -786,16 +780,6 @@ class GrblMotorController:
                 # Clear lockout before each attempt.
                 self.send("$X")
                 time.sleep(0.2)
-
-                # Capture current state and any already-active limit pins before starting the axis.
-                self.send_immediate("?")
-                time.sleep(0.2)
-                with self.status_lock:
-                    pre_state = self.machine_state
-                    pre_pins = getattr(self, 'last_limit_pins', "")
-                logger.info(
-                    f"{axis_name} attempt {attempt}: pre-home status state={pre_state}, pins={pre_pins or 'none'}"
-                )
 
                 self.send(f"$44={axis_mask}")
                 ok, response = self._send_and_wait_response(timeout=3.0)
