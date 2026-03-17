@@ -843,8 +843,8 @@ class GrblMotorController:
                     logger.warning(f"{axis_name} attempt {attempt}: {last_error}")
                     continue
 
-                # Use explicit axis homing to avoid firmware paths that treat plain $H as all-axes.
-                self.send(f"$H{axis_name}")
+                # Firmware only supports plain $H; single-axis targeting is done via $44 mask above.
+                self.send("$H")
                 ok, response = self._send_and_wait_response(timeout=120.0)
                 if not ok:
                     last_error = response
