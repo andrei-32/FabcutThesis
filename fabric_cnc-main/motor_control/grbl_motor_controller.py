@@ -366,17 +366,17 @@ class GrblMotorController:
                 "$100": "20.32000",   # X steps/inch
                 "$101": "20.32000",   # Y steps/inch  
                 "$102": "677.33333",  # Z steps/inch (calibrated from ~1.5 cm actual on 1.0 in command)
-                "$103": "254.00000",  # A steps/inch (calibrated; keep synced with both controller copies)
+                "$103": "150.00000",  # A steps/inch (calibrated; keep synced with both controller copies)
                 
                 # Maximum rates (mm/min)
-                "$110": f"{max_rate.get('X', 6000.0):.3f}",   # X max rate
-                "$111": f"{max_rate.get('Y', 6000.0):.3f}",   # Y max rate
+                "$110": f"{max_rate.get('X', 5000.0):.3f}",   # X max rate
+                "$111": f"{max_rate.get('Y', 5000.0):.3f}",   # Y max rate
                 "$112": f"{max_rate.get('Z', 1200.0):.3f}",   # Z max rate
                 "$113": f"{max_rate.get('A', 60.0):.3f}",     # A max rate
                 
                 # Acceleration (mm/sec^2)
-                "$120": f"{accel.get('X', 300.0):.3f}",    # X acceleration
-                "$121": f"{accel.get('Y', 300.0):.3f}",    # Y acceleration
+                "$120": f"{accel.get('X', 400.0):.3f}",    # X acceleration
+                "$121": f"{accel.get('Y', 400.0):.3f}",    # Y acceleration
                 "$122": f"{accel.get('Z', 96.0):.3f}",     # Z acceleration
                 "$123": f"{accel.get('A', 10.0):.3f}",      # A acceleration
                 
