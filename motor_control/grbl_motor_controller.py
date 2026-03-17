@@ -10,7 +10,7 @@ import psutil
 import logging
 import glob
 import serial.tools.list_ports
-from config import MACHINE_CONFIG
+from config import MACHINE_CONFIG, GRBL_SPEED_CONFIG
 
 logger = logging.getLogger(__name__)
 
@@ -311,6 +311,8 @@ class GrblMotorController:
         """Configure comprehensive GRBL settings for proper operation.""" 
         try:
             # Configure GRBL settings
+            max_rate = GRBL_SPEED_CONFIG.get('MAX_RATE_MM_MIN', {})
+            accel = GRBL_SPEED_CONFIG.get('ACCEL_MM_SEC2', {})
             
             # Define all required settings
             settings = {
@@ -368,17 +370,17 @@ class GrblMotorController:
                 "$102": "677.33333",  # Z steps/inch (calibrated from ~1.5 cm actual on 1.0 in command)
                 "$103": "254.00000",  # A steps/inch (calibrated; keep synced with both controller copies)
                 
-                # Maximum rates (mm/min) - must be >= $25 or homing seek rate is silently capped
-                "$110": "3000.000",   # X max rate
-                "$111": "3000.000",   # Y max rate
-                "$112": "1000.000",   # Z max rate (conservative for safety)
-                "$113": "50.000",     # A max rate (VERY conservative to prevent fast spinning)
+                # Maximum rates (mm/min)
+                "$110": f"{max_rate.get('X', 3000.0):.3f}",   # X max rate
+                "$111": f"{max_rate.get('Y', 3000.0):.3f}",   # Y max rate
+                "$112": f"{max_rate.get('Z', 1000.0):.3f}",   # Z max rate
+                "$113": f"{max_rate.get('A', 50.0):.3f}",     # A max rate
                 
-                # Acceleration (inches/sec²) - Lower values for smoother, safer motion
-                "$120": "100.000",    # X acceleration (reduced for smoother moves)
-                "$121": "100.000",    # Y acceleration (reduced for smoother moves)
-                "$122": "50.000",     # Z acceleration (reduced for safer Z moves)
-                "$123": "5.000",      # A acceleration (VERY conservative for smooth rotation)
+                # Acceleration (mm/sec^2)
+                "$120": f"{accel.get('X', 100.0):.3f}",    # X acceleration
+                "$121": f"{accel.get('Y', 100.0):.3f}",    # Y acceleration
+                "$122": f"{accel.get('Z', 50.0):.3f}",     # Z acceleration
+                "$123": f"{accel.get('A', 5.0):.3f}",      # A acceleration
                 
                 # Maximum travel (mm for GRBL)
                 "$130": "1727.000",   # X max travel
@@ -744,9 +746,13 @@ class GrblMotorController:
 
         return False, f"timeout waiting homing completion, state={state}, pins={pins}"
 
-    def jog(self, axis, delta, feedrate=100):
+    def jog(self, axis, delta, feedrate=None):
         if axis not in "XYZA":
             raise ValueError("Invalid axis")
+
+        if feedrate is None:
+            jog_defaults = GRBL_SPEED_CONFIG.get('JOG_FEEDRATE_IPM', {})
+            feedrate = jog_defaults.get(axis, 100)
         
         # GRBL jog commands are inherently relative
         command = f"$J=G91 {axis}{delta:.5f} F{feedrate}"

@@ -737,9 +737,13 @@ class GrblMotorController:
 
         return False, f"timeout waiting homing completion, state={state}, pins={pins}"
 
-    def jog(self, axis, delta, feedrate=100):
+    def jog(self, axis, delta, feedrate=None):
         if axis not in "XYZA":
             raise ValueError("Invalid axis")
+
+        if feedrate is None:
+            jog_defaults = GRBL_SPEED_CONFIG.get('JOG_FEEDRATE_IPM', {})
+            feedrate = jog_defaults.get(axis, 100)
         
         # Use G91 for relative movement, let GRBL use current unit mode
         command = f"$J=G91 {axis}{delta:.5f} F{feedrate}"
