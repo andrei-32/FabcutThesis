@@ -379,7 +379,7 @@ class GrblMotorController:
                 # Acceleration (mm/sec^2)
                 "$120": f"{accel.get('X', 100.0):.3f}",    # X acceleration
                 "$121": f"{accel.get('Y', 100.0):.3f}",    # Y acceleration
-                "$122": f"{accel.get('Z', 30.0):.3f}",     # Z acceleration
+                "$122": f"{accel.get('Z', 20.0):.3f}",     # Z acceleration
                 "$123": f"{accel.get('A', 5.0):.3f}",      # A acceleration
                 
                 # Maximum travel (mm for GRBL)
