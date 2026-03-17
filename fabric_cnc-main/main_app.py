@@ -246,13 +246,8 @@ class RealMotorController:
             
             
             if abs(actual_delta) > 1e-6:
-                # Use specified jog feedrates for each axis
-                axis_feedrates = {
-                    'X': 360,    # Slightly faster X jog speed
-                    'Y': 360,    # Slightly faster Y jog speed
-                    'Z': 48,     # Slightly faster Z jog speed
-                    'A': 12      # Slightly faster A jog speed
-                }
+                # Pull jog feed rates from centralized config so speed tuning takes effect.
+                axis_feedrates = config.GRBL_SPEED_CONFIG.get('JOG_FEEDRATE_IPM', {})
                 feedrate = axis_feedrates.get(axis, 100)
                 
                 # Send delta directly to GRBL for all axes

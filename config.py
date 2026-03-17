@@ -224,6 +224,28 @@ MACHINE_CONFIG = {
     'VERIFICATION_DISTANCE': 0.394  # Distance to move for verification (10mm = 0.394 inches)
 }
 
+# GRBL speed configuration used by both startup settings and manual jog commands.
+GRBL_SPEED_CONFIG = {
+    'MAX_RATE_MM_MIN': {
+        'X': 6000.0,
+        'Y': 6000.0,
+        'Z': 1200.0,
+        'A': 60.0,
+    },
+    'ACCEL_MM_SEC2': {
+        'X': 700.0,
+        'Y': 700.0,
+        'Z': 96.0,
+        'A': 10.0,
+    },
+    'JOG_FEEDRATE_IPM': {
+        'X': 360.0,
+        'Y': 360.0,
+        'Z': 48.0,
+        'A': 12.0,
+    },
+}
+
 
 
 # Application configuration

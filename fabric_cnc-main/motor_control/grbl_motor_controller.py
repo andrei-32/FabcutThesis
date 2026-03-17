@@ -10,7 +10,7 @@ import psutil
 import logging
 import glob
 import serial.tools.list_ports
-from config import MACHINE_CONFIG
+from config import MACHINE_CONFIG, GRBL_SPEED_CONFIG
 
 logger = logging.getLogger(__name__)
 
@@ -309,6 +309,8 @@ class GrblMotorController:
         """Configure comprehensive GRBL settings for proper operation.""" 
         try:
             # Configure GRBL settings
+            max_rate = GRBL_SPEED_CONFIG.get('MAX_RATE_MM_MIN', {})
+            accel = GRBL_SPEED_CONFIG.get('ACCEL_MM_SEC2', {})
             
             # Define all required settings
             settings = {
@@ -366,17 +368,17 @@ class GrblMotorController:
                 "$102": "677.33333",  # Z steps/inch (calibrated from ~1.5 cm actual on 1.0 in command)
                 "$103": "254.00000",  # A steps/inch (calibrated; keep synced with both controller copies)
                 
-                # Maximum rates (mm/min) - modest increase for quicker motion while keeping stability margin
-                "$110": "6000.000",   # X max rate
-                "$111": "6000.000",   # Y max rate
-                "$112": "1200.000",   # Z max rate (still conservative for safety)
-                "$113": "60.000",     # A max rate (still conservative to prevent fast spinning)
+                # Maximum rates (mm/min)
+                "$110": f"{max_rate.get('X', 6000.0):.3f}",   # X max rate
+                "$111": f"{max_rate.get('Y', 6000.0):.3f}",   # Y max rate
+                "$112": f"{max_rate.get('Z', 1200.0):.3f}",   # Z max rate
+                "$113": f"{max_rate.get('A', 60.0):.3f}",     # A max rate
                 
-                # Acceleration (inches/sec²) - modest increase to match higher axis rates
-                "$120": "700.000",    # X acceleration
-                "$121": "700.000",    # Y acceleration
-                "$122": "96.000",     # Z acceleration
-                "$123": "10.000",      # A acceleration
+                # Acceleration (mm/sec^2)
+                "$120": f"{accel.get('X', 300.0):.3f}",    # X acceleration
+                "$121": f"{accel.get('Y', 300.0):.3f}",    # Y acceleration
+                "$122": f"{accel.get('Z', 96.0):.3f}",     # Z acceleration
+                "$123": f"{accel.get('A', 10.0):.3f}",      # A acceleration
                 
                 # Maximum travel (mm for GRBL)
                 "$130": "1727.000",   # X max travel
