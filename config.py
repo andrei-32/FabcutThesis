@@ -227,14 +227,14 @@ MACHINE_CONFIG = {
 # GRBL speed configuration used by both startup settings and manual jog commands.
 GRBL_SPEED_CONFIG = {
     'MAX_RATE_MM_MIN': {
-        'X': 6000.0,
-        'Y': 6000.0,
+        'X': 5000.0,
+        'Y': 5000.0,
         'Z': 1200.0,
         'A': 60.0,
     },
     'ACCEL_MM_SEC2': {
-        'X': 700.0,
-        'Y': 700.0,
+        'X': 300.0,
+        'Y': 300.0,
         'Z': 96.0,
         'A': 10.0,
     },
