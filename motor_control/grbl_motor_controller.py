@@ -782,7 +782,7 @@ class GrblMotorController:
         self.send("$21=0")
         time.sleep(0.5)
         
-        # Home axes sequentially for predictable behavior.
+        # Home axes sequentially with explicit per-axis commands.
         axis_masks = [("X", "1"), ("Y", "2"), ("Z", "4")]
         for axis_name, axis_mask in axis_masks:
             logger.info(f"Homing {axis_name} axis...")
@@ -813,7 +813,8 @@ class GrblMotorController:
                     logger.warning(f"{axis_name} attempt {attempt}: {last_error}")
                     continue
 
-                self.send("$H")
+                # Use explicit axis homing to avoid firmware paths that treat plain $H as all-axes.
+                self.send(f"$H{axis_name}")
                 ok, response = self._send_and_wait_response(timeout=120.0)
                 if not ok:
                     last_error = response
