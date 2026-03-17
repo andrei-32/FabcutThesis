@@ -361,8 +361,8 @@ class GrblMotorController:
                 "$65": "0",       # Probe allow feed override
                 
                 # Steps per unit (inches)
-                "$100": "50.32000",   # X steps/inch
-                "$101": "50.32000",   # Y steps/inch  
+                "$100": "20.32000",   # X steps/inch
+                "$101": "20.32000",   # Y steps/inch  
                 "$102": "677.33333",  # Z steps/inch (calibrated from ~1.5 cm actual on 1.0 in command)
                 "$103": "254.00000",  # A steps/inch (calibrated; keep synced with both controller copies)
                 
