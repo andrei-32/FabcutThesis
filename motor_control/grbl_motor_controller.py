@@ -337,7 +337,7 @@ class GrblMotorController:
                 "$18": "0",       # Tool change mode
                 "$19": "0",       # Laser mode
                 "$20": "0",       # Soft limits
-                "$21": "0",       # Hard limits disable (prevent A-axis limit issues)
+                "$21": "1",       # Hard limits enable (protects against over-travel)
                 "$22": "1",       # Homing cycle enable
                 "$23": "4",       # Homing direction mask: X-, Y-, Z+, A- (X and Y home negative)
                 "$24": "260.0",   # Homing feed/locate rate (mm/min) - increased for faster final locate phase
@@ -810,7 +810,9 @@ class GrblMotorController:
         time.sleep(0.5)
         
         # Home axes sequentially with explicit per-axis commands.
-        axis_masks = [("X", "1"), ("Y", "2"), ("Z", "4")]
+        # Z homes first to lift the cutting head before X/Y travel.
+        axis_masks = [("Z", "4"), ("X", "1"), ("Y", "2")]
+        failed_axes = []
         for axis_name, axis_mask in axis_masks:
             logger.info(f"Homing {axis_name} axis...")
 
@@ -872,12 +874,29 @@ class GrblMotorController:
                 logger.warning(f"{axis_name} attempt {attempt} did not complete: {done_info}")
 
             if not axis_homed:
-                raise RuntimeError(f"{axis_name} homing failed after retries: {last_error}")
+                if "error:5" in last_error:
+                    logger.error(
+                        f"{axis_name} homing failed (error:5) — limit switch never triggered.\n"
+                        f"  Physical checks:\n"
+                        f"  1. Is the {axis_name} limit switch wired to the correct GRBL input pin?\n"
+                        f"  2. Does the switch LED light when the axis is near home?\n"
+                        f"  3. Run '?' in a serial terminal near the switch — check for '{axis_name}' in Pn: field.\n"
+                        f"  4. Try toggling $5 (limit pin invert) if switch is PNP/NPN mismatch."
+                    )
+                else:
+                    logger.error(f"{axis_name} homing failed after retries: {last_error}")
+                failed_axes.append(axis_name)
+                # Clear alarm and continue so remaining axes can still home.
+                self.send("$X")
+                time.sleep(0.3)
 
         # Restore default XYZ mask after sequential cycle.
         self.send("$44=7")
         self._send_and_wait_response(timeout=3.0)
-        logger.info("Sequential homing complete for X, Y, Z")
+        if failed_axes:
+            logger.warning(f"Homing completed with failures on: {', '.join(failed_axes)}. Successfully homed: {', '.join(a for a, _ in [('Z','4'),('X','1'),('Y','2')] if a not in failed_axes)}")
+        else:
+            logger.info("Sequential homing complete for Z, X, Y")
         
         # Wait for machine to stabilize and get final MACHINE position
         logger.info("Waiting for machine to stabilize after homing...")
@@ -919,8 +938,10 @@ class GrblMotorController:
         
         logger.info(f"Home all completed - work offset set to {self.work_offset}")
         
-        # Keep hard limits disabled after homing (current machine profile).
-        logger.info("Hard limits remain disabled after homing ($21=0).")
+        # Re-enable hard limits now that homing is complete.
+        logger.info("Re-enabling hard limits after homing ($21=1)...")
+        self.send("$21=1")
+        time.sleep(0.2)
         
         # Set GRBL work coordinate system to origin at current position
         # This tells GRBL that the current (homed) position should be (0,0,0,0) in work coordinates
@@ -935,9 +956,11 @@ class GrblMotorController:
         self.send("?")
         time.sleep(0.5)
         
-        # Mark as homed after successful homing
+        # Only mark fully homed if every axis succeeded.
         with self.status_lock:
-            self.is_homed = True
+            self.is_homed = len(failed_axes) == 0
+        if failed_axes:
+            raise RuntimeError(f"Homing incomplete - failed axes: {', '.join(failed_axes)}")
     
     def is_machine_homed(self) -> bool:
         """Check if the machine is currently homed."""
