@@ -478,8 +478,8 @@ class FabricCNCApp:
         self.a_degrees_per_grbl_unit = self.a_jog_divisor * self.a_jog_degrees_per_inch
         
         # Z lower limit control
-        self.z_lower_limit = -1.0  # Runtime adjustable Z lower limit
-        self.z_lower_limit_var = ctk.DoubleVar(value=-2.0)
+        self.z_lower_limit = -1.9  # Runtime adjustable Z lower limit
+        self.z_lower_limit_var = ctk.DoubleVar(value=-1.9)
         self._arrow_key_state = {}
         self._arrow_key_after_ids = {}
         self._current_toolpath_idx = [0, 0]
@@ -861,10 +861,10 @@ class FabricCNCApp:
         ctk.CTkLabel(motor_section, text="Z Lower Limit:", font=("Arial", 11, "bold"), text_color=UI_COLORS['PRIMARY_COLOR']).grid(row=9, column=0, columnspan=2, pady=(6, 2), padx=8)
         z_limit_slider = ctk.CTkSlider(motor_section, from_=2.0, to=3.0, number_of_steps=20, command=self._on_z_limit_slider, height=10)
         z_limit_slider.grid(row=10, column=0, columnspan=2, padx=8, pady=2, sticky="ew")
-        z_limit_slider.set(2.0)
-        self.z_limit_label = ctk.CTkLabel(motor_section, text="-2.00 in", font=("Arial", 10, "bold"), text_color=UI_COLORS['ON_SURFACE'])
+        z_limit_slider.set(1.9)
+        self.z_limit_label = ctk.CTkLabel(motor_section, text="-1.90 in", font=("Arial", 10, "bold"), text_color=UI_COLORS['ON_SURFACE'])
         self.z_limit_label.grid(row=11, column=0, columnspan=2, pady=2)
-        self._on_z_limit_slider(2.0)
+        self._on_z_limit_slider(1.9)
         
         # Home controls section
         home_section = ctk.CTkFrame(self.right_column, fg_color="#d0d0d0", corner_radius=8)
