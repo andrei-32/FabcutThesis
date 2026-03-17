@@ -338,8 +338,8 @@ class GrblMotorController:
                 "$21": "0",       # Hard limits disable (prevent A-axis limit issues)
                 "$22": "44",       # Homing cycle enable
                 "$23": "3",       # Homing direction mask: X+, Y-, Z+, A- (only Y homes negative)
-                "$24": "120.0",   # Homing feed/locate rate (mm/min) - increased for faster final locate phase
-                "$25": "1000",  # Homing seek rate (mm/min) - restored to machine's proven high-speed seek value
+                "$24": "200.0",   # Homing feed/locate rate (mm/min) - increased for faster final locate phase
+                "$25": "3000",  # Homing seek rate (mm/min) - restored to machine's proven high-speed seek value
                 "$26": "250",     # Homing debounce
                 "$27": f"{MACHINE_CONFIG['HOMING_OFFSET'] * 25.4:.3f}",   # Homing pull-off from config (convert inches to mm)
                 "$28": "0",   # G73 retract distance (mm) - chip breaking drilling
@@ -367,7 +367,7 @@ class GrblMotorController:
                 # Steps per unit (inches)
                 "$100": "20.32000",   # X steps/inch    
                 "$101": "20.32000",   # Y steps/inch  
-                "$102": "200",  # Z steps/inch (calibrated from ~1.5 cm actual on 1.0 in command)
+                "$102": "800",  # Z steps/inch (calibrated from ~1.5 cm actual on 1.0 in command)
                 "$103": "254.00000",  # A steps/inch (calibrated; keep synced with both controller copies)
                 
                 # Maximum rates (mm/min)
