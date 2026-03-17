@@ -174,6 +174,7 @@ class GrblMotorController:
         self.machine_state = "Unknown"  # Track GRBL state (Idle, Run, Hold, Alarm, etc.)
         self.last_grbl_error = ""  # Last async error/alarm line from GRBL
         self.last_grbl_error_time = 0.0
+        self.allow_auto_unlock = False  # Enable after startup configuration completes
         self.default_homing_cycle_mask = "7"  # Updated from configured $44 during GRBL setup
 
         self.reader_thread = threading.Thread(target=self._read_loop, daemon=True)
@@ -196,6 +197,7 @@ class GrblMotorController:
         self.send("G90")  # Set absolute positioning
         self.send("G10 P1 L20 X0 Y0 Z0 A0")  # Reset work coordinates to 0,0,0,0
         self.send("G54")  # Select work coordinate system 1
+        self.allow_auto_unlock = True
         # Reset position tracking
         with self.status_lock:
             self.position = [0.0, 0.0, 0.0, 0.0]
@@ -535,20 +537,15 @@ class GrblMotorController:
                                     if self.response_callback:
                                         self.response_callback(f"ERROR: {decoded} - {error_msg}")
                                     
-                                    # Auto-clear alarm if error:9 (alarm state) or error:79 (unlock failed)
-                                    if decoded == "error:9" or decoded == "error:79":
+                                    # Auto-clear only lockout errors after startup completes.
+                                    # Do not auto-recover error:79 here: it can create an unlock/reset loop
+                                    # while homing is not yet enabled or a limit is active.
+                                    if decoded == "error:9" and self.allow_auto_unlock:
                                         current_time = time.time()
-                                        # Only try to clear alarm once every 5 seconds to avoid spam
                                         if current_time - self.last_error_time > 5.0:
                                             self.last_error_time = current_time
-                                            if decoded == "error:9":
-                                                logger.info("Auto-clearing alarm state (error:9)...")
-                                                self.send("$X")  # Send unlock command
-                                            elif decoded == "error:79":
-                                                logger.info("Unlock failed (error:79) - trying reset + unlock...")
-                                                self.send_immediate("\x18")  # Soft reset
-                                                time.sleep(1)
-                                                self.send("$X")  # Try unlock after reset
+                                            logger.info("Auto-clearing alarm state (error:9)...")
+                                            self.send("$X")
                                 else:
                                     # Avoid terminal spam from routine controller chatter.
                                     if decoded.strip():
@@ -1118,13 +1115,7 @@ class GrblMotorController:
     def _startup_alarm_clear(self):
         """Robust alarm clearing sequence for startup."""
         try:
-            # Comprehensive alarm clearing sequence
-            
-            # Method 1: Try simple unlock first
-            self.send("$X")
-            time.sleep(2)
-            
-            # Method 2: If still in alarm, try soft reset + unlock
+            # Use a single soft reset at startup; defer unlock until homing/config stage.
             self.send_immediate("\x18")  # Ctrl-X soft reset
             time.sleep(3)  # Wait for reset
             
@@ -1138,19 +1129,9 @@ class GrblMotorController:
                         pass
                 time.sleep(0.1)
             
-            # Send unlock after reset
-            self.send("$X")
-            time.sleep(1)
-            
-            # Method 3: Try unlock (hard limits already disabled at startup)
-            self.send("$X")     # Try unlock
-            time.sleep(1)
-            
-            # Method 4: Final attempt with position reset
-            self.send("G10 P1 L20 X0 Y0 Z0 A0")  # Reset work coordinates
-            time.sleep(0.5)
-            self.send("$X")  # Final unlock attempt
-            time.sleep(1)
+            # Query status once so machine_state is populated early.
+            self.send_immediate("?")
+            time.sleep(0.3)
             
         except Exception as e:
             logger.error(f"Failed during startup alarm clearing: {e}")
