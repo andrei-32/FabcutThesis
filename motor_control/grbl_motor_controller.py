@@ -811,22 +811,44 @@ class GrblMotorController:
         
         # Home axes sequentially with explicit per-axis commands.
         # Z homes first to lift the cutting head before X/Y travel.
-        axis_masks = [("Z", "4"), ("X", "1"), ("Y", "2")]
+        # Tuple: (axis_name, $44_mask, $23_dir_bit, max_travel_setting, max_travel_mm)
+        axis_defs = [("Z", "4", 2, "$132", "127.000"),
+                     ("X", "1", 0, "$130", "1727.000"),
+                     ("Y", "2", 1, "$131", "1143.000")]
         failed_axes = []
-        for axis_name, axis_mask in axis_masks:
+
+        # Track current $23 value so we can flip per-axis direction bits if needed.
+        current_dir_mask = 4  # matches startup setting $23=4
+
+        for axis_name, axis_mask, dir_bit, travel_setting, travel_value in axis_defs:
             logger.info(f"Homing {axis_name} axis...")
+
+            # Re-apply this axis's max travel to ensure EEPROM isn't holding a stale small value.
+            self.send(f"{travel_setting}={travel_value}")
+            time.sleep(0.2)
 
             axis_homed = False
             last_error = "unknown"
-            for attempt in range(1, 4):
+            tried_dir_flip = False
+            seek_fail_count = 0  # count ALARM:8 / error:5 to trigger direction flip
+
+            for attempt in range(1, 5):  # up to 4 attempts: 3 normal + 1 direction-flipped
                 self._drain_ack_queue()
                 self._clear_last_grbl_error()
+
+                # If all prior attempts were seek-distance / switch-not-found failures,
+                # flip the $23 direction bit for this axis on attempt 4.
+                if attempt == 4 and not tried_dir_flip and seek_fail_count >= 3:
+                    current_dir_mask ^= (1 << dir_bit)
+                    self.send(f"$23={current_dir_mask}")
+                    time.sleep(0.2)
+                    logger.info(f"{axis_name}: all seeks failed — trying opposite direction ($23={current_dir_mask})")
+                    tried_dir_flip = True
 
                 # Clear lockout before each attempt.
                 self.send("$X")
                 time.sleep(0.2)
 
-                # Capture current state and any already-active limit pins before starting the axis.
                 self.send_immediate("?")
                 time.sleep(0.2)
                 with self.status_lock:
@@ -850,16 +872,19 @@ class GrblMotorController:
                     last_error = response
                     logger.warning(f"{axis_name} attempt {attempt} failed: {response}")
                     if response in ("error:5", "error:9", "error:79"):
+                        seek_fail_count += 1
                         self.send("$X")
                         time.sleep(0.3)
                     continue
 
-                # Catch async homing failures that can arrive right after an initial "ok".
+                # Catch async homing failures that arrive right after an initial "ok".
                 time.sleep(0.2)
                 recent_error = self._get_recent_grbl_error(max_age_seconds=2.0)
                 if recent_error:
                     last_error = recent_error
                     logger.warning(f"{axis_name} attempt {attempt} failed: async {recent_error}")
+                    if "ALARM:8" in recent_error or "error:5" in recent_error:
+                        seek_fail_count += 1
                     self.send("$X")
                     time.sleep(0.3)
                     continue
