@@ -172,6 +172,8 @@ class GrblMotorController:
         self.response_callback = None  # Callback for manual command responses
         self.is_homed = False  # Track if machine is homed
         self.machine_state = "Unknown"  # Track GRBL state (Idle, Run, Hold, Alarm, etc.)
+        self.last_grbl_error = ""  # Last async error/alarm line from GRBL
+        self.last_grbl_error_time = 0.0
         self.default_homing_cycle_mask = "7"  # Updated from configured $44 during GRBL setup
 
         self.reader_thread = threading.Thread(target=self._read_loop, daemon=True)
@@ -516,6 +518,11 @@ class GrblMotorController:
                             # Put acknowledgments in queue for G-code streaming
                             if decoded == "ok" or decoded.startswith("error:") or decoded.startswith("ALARM:"):
                                 self.ack_queue.put(decoded)
+
+                            if decoded.startswith("error:") or decoded.startswith("ALARM:"):
+                                with self.status_lock:
+                                    self.last_grbl_error = decoded
+                                    self.last_grbl_error_time = time.time()
                             
                             if self.debug_mode:
                                 print(f"[GRBL RESP] {decoded}")
@@ -705,6 +712,22 @@ class GrblMotorController:
         except queue.Empty:
             pass
 
+    def _clear_last_grbl_error(self):
+        """Clear tracked async GRBL error/alarm line."""
+        with self.status_lock:
+            self.last_grbl_error = ""
+            self.last_grbl_error_time = 0.0
+
+    def _get_recent_grbl_error(self, max_age_seconds=1.0):
+        """Return a recently seen async error/alarm line, or empty string."""
+        with self.status_lock:
+            err = self.last_grbl_error
+            ts = self.last_grbl_error_time
+
+        if err and (time.time() - ts) <= max_age_seconds:
+            return err
+        return ""
+
     def _wait_for_homing_motion_complete(self, timeout=30.0):
         """Wait until homing motion has started and returned to Idle."""
         start_time = time.time()
@@ -713,6 +736,10 @@ class GrblMotorController:
         pins = ""
 
         while time.time() - start_time < timeout:
+            recent_error = self._get_recent_grbl_error(max_age_seconds=2.0)
+            if recent_error:
+                return False, f"async {recent_error}"
+
             self.send_immediate("?")
             time.sleep(0.15)
 
@@ -791,6 +818,7 @@ class GrblMotorController:
             last_error = "unknown"
             for attempt in range(1, 4):
                 self._drain_ack_queue()
+                self._clear_last_grbl_error()
 
                 # Clear lockout before each attempt.
                 self.send("$X")
@@ -819,9 +847,19 @@ class GrblMotorController:
                 if not ok:
                     last_error = response
                     logger.warning(f"{axis_name} attempt {attempt} failed: {response}")
-                    if response in ("error:9", "error:79"):
+                    if response in ("error:5", "error:9", "error:79"):
                         self.send("$X")
                         time.sleep(0.3)
+                    continue
+
+                # Catch async homing failures that can arrive right after an initial "ok".
+                time.sleep(0.2)
+                recent_error = self._get_recent_grbl_error(max_age_seconds=2.0)
+                if recent_error:
+                    last_error = recent_error
+                    logger.warning(f"{axis_name} attempt {attempt} failed: async {recent_error}")
+                    self.send("$X")
+                    time.sleep(0.3)
                     continue
 
                 done_ok, done_info = self._wait_for_homing_motion_complete(timeout=120.0)
