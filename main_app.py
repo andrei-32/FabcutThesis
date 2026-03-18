@@ -707,15 +707,15 @@ class FabricCNCApp:
         self.x_buffer_entry.grid(row=0, column=2, padx=(0, 1))
         ctk.CTkButton(offset_frame, text="+", width=24, height=24, font=("Arial", 12, "bold"),
                       command=lambda: self._adjust_buffer('x', 1)).grid(row=0, column=3, padx=(0, 8))
-        # Y offset
-        ctk.CTkLabel(offset_frame, text="Y:", font=("Arial", 10), text_color=UI_COLORS['ON_SURFACE']).grid(row=0, column=4, padx=(0, 2))
+        # Y offset (second row)
+        ctk.CTkLabel(offset_frame, text="Y:", font=("Arial", 10), text_color=UI_COLORS['ON_SURFACE']).grid(row=1, column=0, padx=(0, 2), pady=(4, 0))
         ctk.CTkButton(offset_frame, text="-", width=24, height=24, font=("Arial", 12, "bold"),
-                      command=lambda: self._adjust_buffer('y', -1)).grid(row=0, column=5, padx=(0, 1))
+                      command=lambda: self._adjust_buffer('y', -1)).grid(row=1, column=1, padx=(0, 1), pady=(4, 0))
         self.y_buffer_entry = ctk.CTkEntry(offset_frame, width=50, height=24, font=("Arial", 10))
         self.y_buffer_entry.insert(0, str(self.y_buffer_inches))
-        self.y_buffer_entry.grid(row=0, column=6, padx=(0, 1))
+        self.y_buffer_entry.grid(row=1, column=2, padx=(0, 1), pady=(4, 0))
         ctk.CTkButton(offset_frame, text="+", width=24, height=24, font=("Arial", 12, "bold"),
-                      command=lambda: self._adjust_buffer('y', 1)).grid(row=0, column=7, padx=(0, 0))
+                      command=lambda: self._adjust_buffer('y', 1)).grid(row=1, column=3, padx=(0, 0), pady=(4, 0))
         # Apply button
         apply_offset_btn = self._create_stylish_button(load_design_section, "Apply Offset", self._apply_pattern_offset, "secondary", height=24)
         apply_offset_btn.pack(fill="x", padx=8, pady=(0, 6))
