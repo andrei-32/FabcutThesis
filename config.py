@@ -235,7 +235,7 @@ GRBL_SPEED_CONFIG = {
     'ACCEL_MM_SEC2': {
         'X': 400.0,
         'Y': 400.0,
-        'Z': 20.0,
+        'Z': 10.0,
         'A': 10.0,
     },
     'JOG_FEEDRATE_IPM': {

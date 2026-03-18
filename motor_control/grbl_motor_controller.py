@@ -367,7 +367,7 @@ class GrblMotorController:
                 # Steps per unit (inches)
                 "$100": "20.32000",   # X steps/inch    
                 "$101": "20.32000",   # Y steps/inch  
-                "$102": "730.00000",  # Z steps/inch (calibrated from ~1.5 cm actual on 1.0 in command)
+                "$102": "740.00000",  # Z steps/inch (calibrated from ~1.5 cm actual on 1.0 in command)
                 "$103": "254.00000",  # A steps/inch (calibrated; keep synced with both controller copies)
                 
                 # Maximum rates (mm/min)
@@ -379,8 +379,8 @@ class GrblMotorController:
                 # Acceleration (mm/sec^2)
                 "$120": f"{accel.get('X', 100.0):.3f}",    # X acceleration
                 "$121": f"{accel.get('Y', 100.0):.3f}",    # Y acceleration
-                "$122": f"{accel.get('Z', 20.0):.3f}",     # Z acceleration
-                "$123": f"{accel.get('A', 5.0):.3f}",      # A acceleration
+                "$122": f"{accel.get('Z', 10.0):.3f}",     # Z acceleration
+                "$123": f"{accel.get('A', 10.0):.3f}",     # A acceleration
                 
                 # Maximum travel (mm for GRBL)
                 "$130": "1727.000",   # X max travel
