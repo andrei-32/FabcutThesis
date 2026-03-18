@@ -778,8 +778,8 @@ class GrblMotorController:
         self.send("$21=0")
         time.sleep(0.5)
         
-        # Home axes sequentially for predictable behavior.
-        axis_masks = [("X", "1"), ("Y", "2"), ("Z", "4")]
+        # Home Z first to lift the blade before moving X/Y (prevents blade damage).
+        axis_masks = [("Z", "4"), ("X", "1"), ("Y", "2")]
         for axis_name, axis_mask in axis_masks:
             logger.info(f"Homing {axis_name} axis...")
 

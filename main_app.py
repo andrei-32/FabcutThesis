@@ -698,18 +698,24 @@ class FabricCNCApp:
         ctk.CTkLabel(load_design_section, text="Pattern Offset (inches)", font=("Arial", 11, "bold"), text_color=UI_COLORS['PRIMARY_COLOR']).pack(pady=(4, 2), padx=8, anchor="w")
         offset_frame = ctk.CTkFrame(load_design_section, fg_color="transparent")
         offset_frame.pack(fill="x", padx=8, pady=(0, 4))
-        offset_frame.grid_columnconfigure(1, weight=1)
-        offset_frame.grid_columnconfigure(3, weight=1)
         # X offset
         ctk.CTkLabel(offset_frame, text="X:", font=("Arial", 10), text_color=UI_COLORS['ON_SURFACE']).grid(row=0, column=0, padx=(0, 2))
+        ctk.CTkButton(offset_frame, text="-", width=24, height=24, font=("Arial", 12, "bold"),
+                      command=lambda: self._adjust_buffer('x', -1)).grid(row=0, column=1, padx=(0, 1))
         self.x_buffer_entry = ctk.CTkEntry(offset_frame, width=50, height=24, font=("Arial", 10))
         self.x_buffer_entry.insert(0, str(self.x_buffer_inches))
-        self.x_buffer_entry.grid(row=0, column=1, padx=(0, 6))
+        self.x_buffer_entry.grid(row=0, column=2, padx=(0, 1))
+        ctk.CTkButton(offset_frame, text="+", width=24, height=24, font=("Arial", 12, "bold"),
+                      command=lambda: self._adjust_buffer('x', 1)).grid(row=0, column=3, padx=(0, 8))
         # Y offset
-        ctk.CTkLabel(offset_frame, text="Y:", font=("Arial", 10), text_color=UI_COLORS['ON_SURFACE']).grid(row=0, column=2, padx=(0, 2))
+        ctk.CTkLabel(offset_frame, text="Y:", font=("Arial", 10), text_color=UI_COLORS['ON_SURFACE']).grid(row=0, column=4, padx=(0, 2))
+        ctk.CTkButton(offset_frame, text="-", width=24, height=24, font=("Arial", 12, "bold"),
+                      command=lambda: self._adjust_buffer('y', -1)).grid(row=0, column=5, padx=(0, 1))
         self.y_buffer_entry = ctk.CTkEntry(offset_frame, width=50, height=24, font=("Arial", 10))
         self.y_buffer_entry.insert(0, str(self.y_buffer_inches))
-        self.y_buffer_entry.grid(row=0, column=3, padx=(0, 0))
+        self.y_buffer_entry.grid(row=0, column=6, padx=(0, 1))
+        ctk.CTkButton(offset_frame, text="+", width=24, height=24, font=("Arial", 12, "bold"),
+                      command=lambda: self._adjust_buffer('y', 1)).grid(row=0, column=7, padx=(0, 0))
         # Apply button
         apply_offset_btn = self._create_stylish_button(load_design_section, "Apply Offset", self._apply_pattern_offset, "secondary", height=24)
         apply_offset_btn.pack(fill="x", padx=8, pady=(0, 6))
@@ -2637,6 +2643,17 @@ class FabricCNCApp:
         self.jog_size_label.configure(text=f"{size_inches:.2f} in")
         # Update the actual jog size
         self.jog_size = size_inches  # Already in inches
+
+    def _adjust_buffer(self, axis, delta):
+        """Increment or decrement an offset buffer entry by delta inches."""
+        entry = self.x_buffer_entry if axis == 'x' else self.y_buffer_entry
+        try:
+            current = float(entry.get())
+        except ValueError:
+            current = 0.0
+        new_val = max(0.0, current + delta)
+        entry.delete(0, "end")
+        entry.insert(0, str(new_val))
 
     def _read_buffer_entries(self):
         """Read X/Y buffer values from the UI entries."""
