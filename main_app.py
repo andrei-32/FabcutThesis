@@ -477,6 +477,10 @@ class FabricCNCApp:
         self.a_jog_degrees_per_inch = 10.0
         self.a_degrees_per_grbl_unit = self.a_jog_divisor * self.a_jog_degrees_per_inch
         
+        # DXF pattern offset (buffer from origin)
+        self.x_buffer_inches = 16.0
+        self.y_buffer_inches = 16.0
+        
         # Z lower limit control
         self.z_lower_limit = -1.9  # Runtime adjustable Z lower limit
         self.z_lower_limit_var = ctk.DoubleVar(value=-1.9)
@@ -690,6 +694,26 @@ class FabricCNCApp:
         # Import DXF button (fit sidebar, compact)
         import_btn = self._create_stylish_button(load_design_section, "📁  Import DXF", self._import_dxf, "primary", height=30)
         import_btn.pack(fill="x", padx=8, pady=(0, 6))
+        # Pattern Offset controls
+        ctk.CTkLabel(load_design_section, text="Pattern Offset (inches)", font=("Arial", 11, "bold"), text_color=UI_COLORS['PRIMARY_COLOR']).pack(pady=(4, 2), padx=8, anchor="w")
+        offset_frame = ctk.CTkFrame(load_design_section, fg_color="transparent")
+        offset_frame.pack(fill="x", padx=8, pady=(0, 4))
+        offset_frame.grid_columnconfigure(1, weight=1)
+        offset_frame.grid_columnconfigure(3, weight=1)
+        # X offset
+        ctk.CTkLabel(offset_frame, text="X:", font=("Arial", 10), text_color=UI_COLORS['ON_SURFACE']).grid(row=0, column=0, padx=(0, 2))
+        self.x_buffer_entry = ctk.CTkEntry(offset_frame, width=50, height=24, font=("Arial", 10))
+        self.x_buffer_entry.insert(0, str(self.x_buffer_inches))
+        self.x_buffer_entry.grid(row=0, column=1, padx=(0, 6))
+        # Y offset
+        ctk.CTkLabel(offset_frame, text="Y:", font=("Arial", 10), text_color=UI_COLORS['ON_SURFACE']).grid(row=0, column=2, padx=(0, 2))
+        self.y_buffer_entry = ctk.CTkEntry(offset_frame, width=50, height=24, font=("Arial", 10))
+        self.y_buffer_entry.insert(0, str(self.y_buffer_inches))
+        self.y_buffer_entry.grid(row=0, column=3, padx=(0, 0))
+        # Apply button
+        apply_offset_btn = self._create_stylish_button(load_design_section, "Apply Offset", self._apply_pattern_offset, "secondary", height=24)
+        apply_offset_btn.pack(fill="x", padx=8, pady=(0, 6))
+
         # Pattern Library label and dropdown
         ctk.CTkLabel(load_design_section, text="Pattern Library", font=("Arial", 11, "bold"), text_color=UI_COLORS['PRIMARY_COLOR']).pack(pady=(4, 2), padx=8, anchor="w")
         # Container frame for patterns browser
@@ -1448,7 +1472,8 @@ class FabricCNCApp:
         
         try:
             # Process DXF using basic approach (now integrated into DXFProcessor)
-            self.processed_shapes = self.dxf_processor.process_dxf(file_path)
+            self._read_buffer_entries()
+            self.processed_shapes = self.dxf_processor.process_dxf(file_path, x_buffer_inches=self.x_buffer_inches, y_buffer_inches=self.y_buffer_inches)
             
             if not self.processed_shapes:
                 logger.error("No shapes found in DXF file.")
@@ -1770,7 +1795,8 @@ class FabricCNCApp:
                 return
             
             # Process DXF
-            self.processed_shapes = self.dxf_processor.process_dxf(file_path)
+            self._read_buffer_entries()
+            self.processed_shapes = self.dxf_processor.process_dxf(file_path, x_buffer_inches=self.x_buffer_inches, y_buffer_inches=self.y_buffer_inches)
             
             if not self.processed_shapes:
                 logger.error("No shapes found in DXF file.")
@@ -2611,6 +2637,42 @@ class FabricCNCApp:
         self.jog_size_label.configure(text=f"{size_inches:.2f} in")
         # Update the actual jog size
         self.jog_size = size_inches  # Already in inches
+
+    def _read_buffer_entries(self):
+        """Read X/Y buffer values from the UI entries."""
+        try:
+            self.x_buffer_inches = float(self.x_buffer_entry.get())
+        except (ValueError, AttributeError):
+            pass
+        try:
+            self.y_buffer_inches = float(self.y_buffer_entry.get())
+        except (ValueError, AttributeError):
+            pass
+
+    def _apply_pattern_offset(self):
+        """Re-process the current DXF file with updated offset values."""
+        self._read_buffer_entries()
+        logger.info(f"Applying pattern offset: X={self.x_buffer_inches}, Y={self.y_buffer_inches}")
+        
+        if not hasattr(self, 'dxf_file_path') or not self.dxf_file_path:
+            self.status_label.configure(text=self._truncate_status("Load DXF first"), text_color="orange")
+            return
+        
+        if not self._initialize_dxf_processing():
+            self.status_label.configure(text=self._truncate_status("Missing DXF deps"), text_color="red")
+            return
+        
+        try:
+            self.processed_shapes = self.dxf_processor.process_dxf(
+                self.dxf_file_path, x_buffer_inches=self.x_buffer_inches, y_buffer_inches=self.y_buffer_inches)
+            if self.processed_shapes:
+                self._schedule_canvas_redraw()
+                self.status_label.configure(text=self._truncate_status(f"Offset: X={self.x_buffer_inches}, Y={self.y_buffer_inches}"), text_color="green")
+            else:
+                self.status_label.configure(text=self._truncate_status("No shapes found"), text_color="red")
+        except Exception as e:
+            logger.error(f"Error applying offset: {e}")
+            self.status_label.configure(text=self._truncate_status("Offset failed"), text_color="red")
         
     def _on_z_limit_slider(self, value):
         # Convert slider value to negative Z limit (2.0 to 3.0 -> -2.0 to -3.0)

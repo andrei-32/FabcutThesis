@@ -25,7 +25,7 @@ class DXFProcessor:
         """
         self.max_angle_change_radians = math.radians(max_angle_change_degrees)
         
-    def process_dxf_basic(self, dxf_path: str, min_distance: float = 0.1) -> Dict[str, List[Tuple[float, float]]]:
+    def process_dxf_basic(self, dxf_path: str, min_distance: float = 0.1, x_buffer_inches: float = 16.0, y_buffer_inches: float = 16.0) -> Dict[str, List[Tuple[float, float]]]:
         """
         Process DXF file using basic approach with point reduction, centering, and positioning.
         Uses simple spline approximation, reduces points to specified spacing, then applies
@@ -124,7 +124,7 @@ class DXFProcessor:
             merged_shapes = self._merge_connected_shapes(shapes)
             
             # 2. Position shapes at machine origin (bottom-left at X=0, Y=0)
-            positioned_shapes = self._position_shapes_bottom_left(merged_shapes, x_buffer_inches=16, y_buffer_inches=16)
+            positioned_shapes = self._position_shapes_bottom_left(merged_shapes, x_buffer_inches=x_buffer_inches, y_buffer_inches=y_buffer_inches)
             
             logger.info(f"Processed {len(shapes)} entities with basic approach, merged into {len(merged_shapes)} shapes")
             return positioned_shapes
@@ -133,17 +133,19 @@ class DXFProcessor:
             logger.error(f"Error processing DXF file with basic approach: {e}")
             return {}
 
-    def process_dxf(self, dxf_path: str) -> Dict[str, List[Tuple[float, float]]]:
+    def process_dxf(self, dxf_path: str, x_buffer_inches: float = 16.0, y_buffer_inches: float = 16.0) -> Dict[str, List[Tuple[float, float]]]:
         """
         Process a DXF file using the basic approach with 0.1" point spacing.
         
         Args:
             dxf_path: Path to the DXF file
+            x_buffer_inches: X offset from origin in inches
+            y_buffer_inches: Y offset from origin in inches
             
         Returns:
             Dictionary mapping shape names to lists of (x, y) coordinate tuples
         """
-        return self.process_dxf_basic(dxf_path, min_distance=0.1)
+        return self.process_dxf_basic(dxf_path, min_distance=0.1, x_buffer_inches=x_buffer_inches, y_buffer_inches=y_buffer_inches)
     
     def _process_line(self, entity) -> List[Tuple[float, float]]:
         """Process a LINE entity."""
