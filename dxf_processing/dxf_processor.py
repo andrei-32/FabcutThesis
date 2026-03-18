@@ -124,7 +124,7 @@ class DXFProcessor:
             merged_shapes = self._merge_connected_shapes(shapes)
             
             # 2. Position shapes at machine origin (bottom-left at X=0, Y=0)
-            positioned_shapes = self._position_shapes_bottom_left(merged_shapes, x_buffer_inches=12.5, y_buffer_inches=12.5)
+            positioned_shapes = self._position_shapes_bottom_left(merged_shapes, x_buffer_inches=16, y_buffer_inches=16)
             
             logger.info(f"Processed {len(shapes)} entities with basic approach, merged into {len(merged_shapes)} shapes")
             return positioned_shapes
