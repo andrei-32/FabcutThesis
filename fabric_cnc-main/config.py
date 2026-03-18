@@ -60,7 +60,7 @@ class Config:
         }
         
         # Work Area Configuration
-        self.work_area = WorkArea(x=30, y=30)  # 30" x 30" work area (matches APP_CONFIG)
+        self.work_area = WorkArea(x=28, y=28)  # 28" x 28" work area (matches APP_CONFIG)
         
         # Motion Configuration
         self.motion = MotionConfig(
@@ -221,8 +221,8 @@ MOTOR_CONFIG = {
 
 # Machine configuration - All machine limits and parameters
 MACHINE_CONFIG = {
-    'MAX_X': 30,  # Maximum X travel in inches (matches work area)
-    'MAX_Y': 30,  # Maximum Y travel in inches (matches work area)
+    'MAX_X': 28,  # Maximum X travel in inches (matches work area)
+    'MAX_Y': 28,  # Maximum Y travel in inches (matches work area)
     'HOMING_OFFSET': 0,  # No homing pull-off
     'VERIFICATION_DISTANCE': 0.394  # Distance to move for verification (10mm = 0.394 inches)
 }
@@ -253,8 +253,8 @@ GRBL_SPEED_CONFIG = {
 
 # Application configuration
 APP_CONFIG = {
-    'X_MAX_INCH': 30,  # 30 inches
-    'Y_MAX_INCH': 30,  # 30 inches
+    'X_MAX_INCH': 28,  # 28 inches
+    'Y_MAX_INCH': 28,  # 28 inches
     'Z_MAX_INCH': 2.5,  # 2.5 inches
     'Z_UP_INCH': -0.75,  # -0.75 inches
     'Z_DOWN_INCH': -0.75,  # Same as hover height for testing
