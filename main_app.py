@@ -478,8 +478,8 @@ class FabricCNCApp:
         self.a_degrees_per_grbl_unit = self.a_jog_divisor * self.a_jog_degrees_per_inch
         
         # DXF pattern offset (buffer from origin)
-        self.x_buffer_inches = 16.0
-        self.y_buffer_inches = 16.0
+        self.x_buffer_inches = 2.0
+        self.y_buffer_inches = 2.0
         
         # Z lower limit control
         self.z_lower_limit = -1.9  # Runtime adjustable Z lower limit
